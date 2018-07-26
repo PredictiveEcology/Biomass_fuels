@@ -17,8 +17,8 @@ defineModule(sim, list(
   documentation = list("README.txt", "LandR_BiomassFuels.Rmd"),
   reqdPkgs = list("data.table", "dplyr"),
   parameters = rbind(
-    defineParameter("hardwoodMax", "numeric", 0L, "Threshold of percent biomass below
-                    which fuel types are considered conifer or mixed")
+    defineParameter(name = "hardwoodMax", class = "numeric", default = 0L, 
+                    desc = "Threshold of percent biomass below which fuel types are considered conifer or mixed")
     ),
   inputObjects = bind_rows(
     expectsInput(objectName = "speciesNames", objectClass = "data.table",
