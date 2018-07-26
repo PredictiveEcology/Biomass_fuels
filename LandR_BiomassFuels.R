@@ -65,21 +65,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
 
 ### template initialization
 Init <- function(sim) {
-  browser()
-  ## create pixelFuelTypes table from cohorData
-  ## subset cohort data and non-na fuel types
-  pixelFuelTypes <- copy(sim$cohortData[, pixelGroup:B])
-  tempFT <- na.omit(copy(FuelTypes[, -c("FuelTypeDesc", "species", "LandRNames"), with = FALSE]))  ## keep only complete lines with spp codes
-  
-  ## merge the two tables and add sppMultipliers
-  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE, nomatch = 0] %>%
-    .[order(pixelGroup)]
-  pixelFuelTypes <- sppMultipliers[!is.na(speciesCode), speciesCode:Coefficient] %>%
-    .[!duplicated(.)] %>%
-    pixelFuelTypes[., on = .(speciesCode), nomatch =0] %>%
-    .[order(pixelGroup)]
-  
-  sim$pixelFuelTypes <- pixelFuelTypes
+  ## this module doesn't require an initialisation
   
   return(invisible(sim))
 }
@@ -196,6 +182,22 @@ prepareTables <- function(sim) {
   sim$FuelTypes <- copy(FuelTypes)
   
   return(invisible(sim))
+  
+  ## PIXEL FUEL TYPES TABLE ------------------------
+  ## create pixelFuelTypes table from cohorData
+  ## subset cohort data and non-na fuel types
+  pixelFuelTypes <- copy(sim$cohortData[, pixelGroup:B])
+  tempFT <- na.omit(copy(FuelTypes[, -c("FuelTypeDesc", "species", "LandRNames"), with = FALSE]))  ## keep only complete lines with spp codes
+  
+  ## merge the two tables and add sppMultipliers
+  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE, nomatch = 0] %>%
+    .[order(pixelGroup)]
+  pixelFuelTypes <- sppMultipliers[!is.na(speciesCode), speciesCode:Coefficient] %>%
+    .[!duplicated(.)] %>%
+    pixelFuelTypes[., on = .(speciesCode), nomatch =0] %>%
+    .[order(pixelGroup)]
+  
+  sim$pixelFuelTypes <- pixelFuelTypes
 }
 
 calcFuelTypes <- function(sim) {
