@@ -101,30 +101,36 @@ prepareTables <- function(sim) {
   speciesNames[, LANDISNames2:=as.character(substring(LANDISNames, 5, 7))]
   speciesNames[LANDISNames2 == "spp" | LANDISNames2 == "all", LANDISNames2:="sp"]
   
-  
   speciesNames[, ':='(LandRNames = paste0(toupper(substring(LANDISNames1, 1, 1)),
                                           tolower(as.character(substring(LANDISNames1, 2, 4))),
                                           "_", tolower(substring(LANDISNames2, 1, 1)),
                                           tolower(as.character(substring(LANDISNames2, 2, 3)))),
                       LANDISNames1 = NULL,
                       LANDISNames2 = NULL)]
+  speciesNames$LANDISNames <- substring(speciesNames$LANDISNames, 1, 7)
   
-  if(any(!tolower(sim$speciesList[,1]) %in% tolower(speciesNames$LandRNames)))
+  speciesList <- sim$speciesList
+  rownames(speciesList) <- sapply(strsplit(speciesList[,1], "_"), function(x) {
+    x[1] <- substring(x[1], 1, 4)
+    x[2] <-  substring(x[2], 1, 3)
+    paste(x, collapse = "_")
+  }) 
+  rownames(speciesList) <- sub("_spp", "_sp", rownames(speciesList))
+  
+  if(any(!tolower(rownames(speciesList)) %in% tolower(speciesNames$LandRNames)))
     warning(cat("\nFollowing selected species not found in the LANDIS species list.\nCheck if this is correct:\n",
-                paste0(sim$speciesList[!tolower(sim$speciesList[,1]) %in%
-                                         tolower(speciesNames$LandRNames), 1],
+                paste0(rownames(speciesList)[!tolower(rownames(speciesList)) %in%
+                                               tolower(speciesNames$LandRNames)],
                        collapse = ", ")))
   
-  ## Convert species names for selected species, creating a 'species' column that matches other tables
-  ## append species codes only after init of LBMR
-  tempList <- sim$speciesList
-  rownames(tempList) <- tolower(tempList[,1])
-  commonSpp <- tolower(speciesNames[tolower(LandRNames) %in% rownames(tempList), LandRNames])
   
-  speciesNames[tolower(LandRNames) %in% rownames(tempList), species := tempList[commonSpp,2]]
+  ## append species codes
+  rownames(speciesList) <- tolower(rownames(speciesList))
+  matchNames <- tolower(speciesNames[tolower(LandRNames) %in% tolower(rownames(speciesList)), LandRNames])
   
+  speciesNames[tolower(LandRNames) %in% rownames(speciesList), species := speciesList[matchNames,2]]
   speciesNames <- merge(speciesNames, sim$species[, c("species", "speciesCode"), with = FALSE],
-                        by = "species", all = TRUE)
+                        by = "species", all.y = TRUE)
   
   sim$speciesNames <- copy(speciesNames)
   
@@ -152,6 +158,9 @@ prepareTables <- function(sim) {
     sppMultipliers <- sppMultipliers[, sum(is.na(.SD)) < 3, by = 1:nrow(sppMultipliers), .SDcols = 1:3] %>%
       .$V1 %>%
       sppMultipliers[.]
+    
+    ## remove potential duplicates
+    sppMultipliers <- sppMultipliers[!duplicated(sppMultipliers)]
     
   } else {
     sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
@@ -191,6 +200,15 @@ prepareTables <- function(sim) {
     ## remove last character to match other tables
     FuelTypes[, Species := substring(Species, 1, 7)]
     
+    FuelTypes <- merge(FuelTypes, speciesNames, by.x = "Species", by.y = "LANDISNames", all.y = TRUE)
+    FuelTypes[, Species := NULL]
+    
+    ## convert some columns to numeric
+    numCols <- c("minAge", "maxAge", "negSwitch")
+    FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
+    
+    sim$FuelTypes <- copy(FuelTypes)
+    
   } else {
     FuelTypes <- prepInputs(targetFile = "FuelTypes.csv",
                             destinationPath = inputPath(sim),
@@ -200,16 +218,17 @@ prepareTables <- function(sim) {
     
     ## remove last character to match other tables
     FuelTypes[, Species := substring(Species, 1, 7)]
+    
+    FuelTypes <- merge(FuelTypes, speciesNames, by.x = "Species", by.y = "LANDISNames", all.y = TRUE)
+    FuelTypes[, Species := NULL]
+    
+    ## convert some columns to numeric
+    numCols <- c("minAge", "maxAge", "negSwitch")
+    FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
+    
+    sim$FuelTypes <- copy(FuelTypes)
   }
   
-  FuelTypes <- merge(FuelTypes, speciesNames, by.x = "Species", by.y = "LANDISNames", all = TRUE)
-  FuelTypes[, Species := NULL]
-  
-  ## convert some columns to numeric
-  numCols <- c("minAge", "maxAge", "negSwitch")
-  FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
-  
-  sim$FuelTypes <- copy(FuelTypes)
   
   ## PIXEL FUEL TYPES TABLE ------------------------
   ## create pixelFuelTypes table from cohorData
@@ -231,7 +250,6 @@ prepareTables <- function(sim) {
 }
 
 calcFuelTypes <- function(sim) {
-  browser()
   ## CALCULATE SPP VALUES FOR EACH FUEL TYPE IN EACH PIXEL ------------------------------
   
   ## calculate pixelFuelTypes per pixelGroup, ecoregion, fuel type and base fuel

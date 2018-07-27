@@ -5,7 +5,7 @@
 ## FINAL FUEL AND BASE TYPES BASED ON MAX SPP VALUE
 ## this function returns the fuel and base type that had the highest sppValue in a pixel
 
-calcFinalFuels <- function(BaseFuel, FuelType, fuelTypeVal, maxValue) {
+calcFinalFuels <- function(BaseFuel, FuelType, fuelTypeVal, maxValue, hardwoodMax) {
   finalFuelType  <- FuelType[which(fuelTypeVal == unique(maxValue))]
   finalBaseFuel <- BaseFuel[which(fuelTypeVal == unique(maxValue))]
   
@@ -38,7 +38,7 @@ calcFinalFuels <- function(BaseFuel, FuelType, fuelTypeVal, maxValue) {
 ## conifer/deciduos sppValues across fuel types for a pixel compared to the hardwoodMax parameter
 ## ATTENTION: the algorithm differs from the original LANDIS-II source code, 
 ## but ideally is closer to what is described in the manual
-calcDominance <- function(sumCon, sumDec, finalBaseFuel){
+calcDominance <- function(sumCon, sumDec, finalBaseFuel, hardwoodMax){
   ## get the initial fuel type attribute dominances
   finalBaseFuel <- finalBaseFuel
   if(finalBaseFuel == "ConiferPlantation") {
