@@ -15,7 +15,10 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "LandR_BiomassFuels.Rmd"),
-  reqdPkgs = list("data.table", "dplyr"),
+  reqdPkgs = list("data.table", "dplyr",
+                  "PredictiveEcology/SpaDES.core@development",
+                  "PredictiveEcology/SpaDES.tools@development",
+                  "CeresBarros/reproducible@development"),
   parameters = rbind(
     defineParameter(name = "hardwoodMax", class = "numeric", default = 0L, 
                     desc = "Threshold of percent biomass below which fuel types are considered conifer or mixed")
@@ -88,7 +91,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
 
 ### template initialization
 fuelsInit <- function(sim) {
-  ## this module doesn't require an initialisation
+  ## this module doesn't require an initialisation as it's objects depend on other model outputs
   
   return(invisible(sim))
 }
@@ -251,7 +254,6 @@ prepareTables <- function(sim) {
 
 calcFuelTypes <- function(sim) {
   ## CALCULATE SPP VALUES FOR EACH FUEL TYPE IN EACH PIXEL ------------------------------
-  
   ## calculate pixelFuelTypes per pixelGroup, ecoregion, fuel type and base fuel
   ## species biomass is weighted by the coeff and becomes 
   ## negative if the species has a negative contribution (negSwitch) to that fuel type
