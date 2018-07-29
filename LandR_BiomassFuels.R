@@ -56,7 +56,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
     eventType,
     init = {
       # do stuff for this event
-      sim <- Init(sim)
+      sim <- fuelsInit(sim)
       
       # schedule future event(s)
       sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
@@ -87,7 +87,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
 }
 
 ### template initialization
-Init <- function(sim) {
+fuelsInit <- function(sim) {
   ## this module doesn't require an initialisation
   
   return(invisible(sim))
