@@ -65,7 +65,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
       sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
                            "LandR_BiomassFuels", "doPrepareTables", eventPriority = 1)
       sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
-                           "LandR_BiomassFuels", "doFuelTypes", eventPriority = 2)
+                           "LandR_BiomassFuels", "doFuelTypes", eventPriority = 1.5)
     },
     doPrepareTables = {
       # do stuff for this event
@@ -73,7 +73,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
       
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim) + sim@params$LBMR$successionTimestep,
-                           "LandR_BiomassFuels", "doPrepareTables")
+                           "LandR_BiomassFuels", "doPrepareTables", eventPriority = 1)
     },
     doFuelTypes = {
       # do stuff for this event
@@ -81,7 +81,7 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
       
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim) + sim@params$LBMR$successionTimestep,
-                           "LandR_BiomassFuels", "doFuelTypes")
+                           "LandR_BiomassFuels", "doFuelTypes",  eventPriority = 1.5)
     },
     warning(paste("Undefined event type: '", current(sim)[1, "eventType", with = FALSE],
                   "' in module '", current(sim)[1, "moduleName", with = FALSE], "'", sep = ""))
