@@ -4,7 +4,7 @@
 # in R packages. If exact location is required, functions will be: sim$<moduleName>$FunctionName
 defineModule(sim, list(
   name = "LandR_BiomassFuels",
-  description = "SpaDES version of the LANDIS-II Dynamic Biomass Fuels Extention", #"insert module description here",
+  description = "SpaDES version of the LANDIS-II Dynamic Biomass Fuels Extention v2.2 - 15 Jun 2017", #"insert module description here",
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"), 
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", 
                    role = c("aut", "cre")),
