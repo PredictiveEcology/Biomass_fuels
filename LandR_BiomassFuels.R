@@ -319,6 +319,7 @@ calcFuelTypes <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
+  dPath <- dataPath(sim) 
   
   if(!suppliedElsewhere("speciesTable", sim)) {
     sim$speciesTable <- prepInputs("speciesTraits.csv", 
