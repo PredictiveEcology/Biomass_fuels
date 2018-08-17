@@ -34,8 +34,8 @@ defineModule(sim, list(
                  desc = "Species table produced by LandR-Biomass that has species traits such as longevity...",
                  sourceURL = NA),
     expectsInput(objectName = "speciesTable", objectClass = "data.table",
-                 desc = "species attributes table, coming from LandR or a LandR data prep module",
-                 sourceURL = NA),
+                 desc = "species attributes table, default is from Dominic and Yan's project",
+                 sourceURL = "https://raw.githubusercontent.com/dcyr/LANDIS-II_IA_generalUseFiles/master/speciesTraits.csv"),
     expectsInput(objectName = "dynamicBiomassFuels", objectClass = "data.table",
                  desc = "Test parameter file from LANDIS-II Dynamic Biomass Fuels Extension", 
                  sourceURL = "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")
@@ -319,6 +319,16 @@ calcFuelTypes <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
+  
+  if(!suppliedElsewhere("speciesTable", sim)) {
+    sim$speciesTable <- prepInputs("speciesTraits.csv", 
+                                   destinationPath = dPath,
+                                   url = extractURL("speciesTable"),
+                                   fun = "utils::read.csv", 
+                                   header = TRUE, stringsAsFactors = FALSE) %>%
+      data.table()
+  }
+  
   ## Get LANDIS test parameters, to use if others
   ## haven't been supplied in <module>/inputs
   
