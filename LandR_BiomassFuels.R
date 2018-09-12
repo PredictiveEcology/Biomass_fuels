@@ -147,37 +147,40 @@ prepareInputTables <- function(sim) {
   
   ## check whether spp names match LANDIS or LandR format
   ## before merging species names and codes
-  if (any(sppMultipliers$Species %in% speciesNames$LANDISNames)) {
-    sppMultipliers <- prepSppMultipliers(sppMultipliers, data.table(species = speciesNames$species,
-                                                                    oldNames = speciesNames$LANDISNames,
-                                                                    speciesCode = speciesNames$speciesCode))
-  } else {
-    if (any(sppMultipliers$Species %in% speciesNames$LandRNames)) {
+  if (time(sim) == (start(sim) + sim@params$LBMR$successionTimestep)) {
+    if (any(sppMultipliers$Species %in% speciesNames$LANDISNames)) {
       sppMultipliers <- prepSppMultipliers(sppMultipliers, data.table(species = speciesNames$species,
-                                                                      oldNames = speciesNames$LandRNames,
+                                                                      oldNames = speciesNames$LANDISNames,
                                                                       speciesCode = speciesNames$speciesCode))
     } else {
-      stop(paste0("Species in sppMultipliers table do not correspond",
-                  "to LANDIS nor LandR species names"))
+      if (any(sppMultipliers$Species %in% speciesNames$LandRNames)) {
+        sppMultipliers <- prepSppMultipliers(sppMultipliers, data.table(species = speciesNames$species,
+                                                                        oldNames = speciesNames$LandRNames,
+                                                                        speciesCode = speciesNames$speciesCode))
+      } else {
+        stop(paste("Species in sppMultipliers table do not correspond",
+                   "to LANDIS nor LandR species names"))
+      }
     }
   }
-  
   ## FUEL TYPES TABLE ---------------------------------------------
   FuelTypes <- sim$FuelTypes
   
   ## check whether spp names match LANDIS or LandR format
-  if (any(FuelTypes$Species %in% speciesNames$LANDISNames)) {
-    FuelTypes <- prepFuelTypes(FuelTypes, data.table(species = speciesNames$species,
-                                                     oldNames = speciesNames$LANDISNames,
-                                                     speciesCode = speciesNames$speciesCode))
-  } else {
-    if (any(FuelTypes$Species %in% speciesNames$LandRNames)) {
+  if (time(sim) == (start(sim) + sim@params$LBMR$successionTimestep)) {
+    if (any(FuelTypes$Species %in% speciesNames$LANDISNames)) {
       FuelTypes <- prepFuelTypes(FuelTypes, data.table(species = speciesNames$species,
-                                                       oldNames = speciesNames$LandRNames,
+                                                       oldNames = speciesNames$LANDISNames,
                                                        speciesCode = speciesNames$speciesCode))
     } else {
-      stop(paste0("Species in FuelTypes table do not correspond",
-                  "to LANDIS nor LandR species names"))
+      if (any(FuelTypes$Species %in% speciesNames$LandRNames)) {
+        FuelTypes <- prepFuelTypes(FuelTypes, data.table(species = speciesNames$species,
+                                                         oldNames = speciesNames$LandRNames,
+                                                         speciesCode = speciesNames$speciesCode))
+      } else {
+        stop(paste("Species in FuelTypes table do not correspond",
+                   "to LANDIS nor LandR species names"))
+      }
     }
   }
   
