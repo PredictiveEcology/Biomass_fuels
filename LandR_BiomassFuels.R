@@ -20,9 +20,10 @@ defineModule(sim, list(
                   "PredictiveEcology/SpaDES.tools@development",
                   "CeresBarros/reproducible@development"),
   parameters = rbind(
-    defineParameter(name = "hardwoodMax", class = "numeric", default = 0L, 
-                    desc = "Threshold of percent biomass below which fuel types are considered conifer or mixed")
-  ),
+    defineParameter(name = "hardwoodMax", class = "numeric", default = 15L, 
+                    desc = "Threshold of percent biomass below which fuel types are considered conifer or mixed. 
+                    Defaults to 15, as in LANDIS example file")
+    ),
   inputObjects = bind_rows(
     expectsInput(objectName = "speciesList", objectClass = c("character", "matrix"),
                  desc = "vector or matrix of species to select, provided by the user or BiomassSpeciesData. 
@@ -36,23 +37,25 @@ defineModule(sim, list(
     expectsInput(objectName = "speciesTable", objectClass = "data.table",
                  desc = "species attributes table, default is from Dominic and Yan's project",
                  sourceURL = "https://raw.githubusercontent.com/dcyr/LANDIS-II_IA_generalUseFiles/master/speciesTraits.csv"),
-    expectsInput(objectName = "dynamicBiomassFuels", objectClass = "data.table",
-                 desc = "Test parameter file from LANDIS-II Dynamic Biomass Fuels Extension", 
-                 sourceURL = "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")
+    expectsInput(objectName = "sppMultipliers", objectClass = "data.table",
+                 desc = "Table of species biomass coefficient weights.
+                 Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
+                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
+    expectsInput(objectName = "FuelTypes", objectClass = "data.table",
+                 desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
+                 min and max age for each species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
+                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
+    expectsInput(objectName = "fTypeEcore", objectClass = "data.table",
+                 desc = "Table of Fuel Types per Ecoregion (optional, see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
+                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")
     ),
   outputObjects = bind_rows(
     createsOutput(objectName = "speciesNames", objectClass = "data.table",
                   desc = "Table of species names/codes correspondences between LANDIS and LandR"),
-    createsOutput(objectName = "sppMultipliers", objectClass = "data.table",
-                  desc = "Table of species biomass coefficient weights.
-                  Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide"),
-    createsOutput(objectName = "FuelTypes", objectClass = "data.table",
-                  desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
-                  min and max age for each species"),
     createsOutput(objectName = "pixelFuelTypes", objectClass = "data.table", 
                   desc = "Fuel types per pixel group, calculated from cohort biomasses")
-    )
-  ))
+  )
+    ))
 
 doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
   switch(
@@ -63,17 +66,17 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
       
       # schedule future event(s)
       sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
-                           "LandR_BiomassFuels", "doPrepareTables", eventPriority = 1)
+                           "LandR_BiomassFuels", "doPrepareInputTables", eventPriority = 1)
       sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
                            "LandR_BiomassFuels", "doFuelTypes", eventPriority = 1.5)
     },
-    doPrepareTables = {
+    doPrepareInputTables = {
       # do stuff for this event
-      sim <- prepareTables(sim)
+      sim <- prepareInputTables(sim)
       
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim) + sim@params$LBMR$successionTimestep,
-                           "LandR_BiomassFuels", "doPrepareTables", eventPriority = 1)
+                           "LandR_BiomassFuels", "doPrepareInputTables", eventPriority = 1)
     },
     doFuelTypes = {
       # do stuff for this event
@@ -91,250 +94,184 @@ doEvent.LandR_BiomassFuels = function(sim, eventTime, eventType) {
 
 ### template initialization
 fuelsInit <- function(sim) {
-  ## this module doesn't require an initialisation as it's objects depend on other model outputs
-  
+  ## no module initalisation necessary
   return(invisible(sim))
 }
 
-prepareTables <- function(sim) {
+prepareInputTables <- function(sim) {
   ## SPECIES NAMES CORRESPONDENCES ------------------------
-  speciesNames <- data.table(LANDISNames = unique(sim$speciesTable[,LandisCode]))
-  speciesNames[, LANDISNames := tolower(gsub("\\.", "", LANDISNames))]
-  speciesNames[, LANDISNames1:=as.character(substring(LANDISNames, 1, 4))]
-  speciesNames[, LANDISNames2:=as.character(substring(LANDISNames, 5, 7))]
-  speciesNames[LANDISNames2 == "spp" | LANDISNames2 == "all", LANDISNames2:="sp"]
-  
-  speciesNames[, ':='(LandRNames = paste0(toupper(substring(LANDISNames1, 1, 1)),
-                                          tolower(as.character(substring(LANDISNames1, 2, 4))),
-                                          "_", tolower(substring(LANDISNames2, 1, 1)),
-                                          tolower(as.character(substring(LANDISNames2, 2, 3)))),
-                      LANDISNames1 = NULL,
-                      LANDISNames2 = NULL)]
-  speciesNames$LANDISNames <- substring(speciesNames$LANDISNames, 1, 7)
-  
-  speciesList <- sim$speciesList
-  rownames(speciesList) <- sapply(strsplit(speciesList[,1], "_"), function(x) {
-    x[1] <- substring(x[1], 1, 4)
-    x[2] <-  substring(x[2], 1, 3)
-    paste(x, collapse = "_")
-  }) 
-  rownames(speciesList) <- sub("_spp", "_sp", rownames(speciesList))
-  
-  if(any(!tolower(rownames(speciesList)) %in% tolower(speciesNames$LandRNames)))
-    warning(cat("\nFollowing selected species not found in the LANDIS species list.\nCheck if this is correct:\n",
-                paste0(rownames(speciesList)[!tolower(rownames(speciesList)) %in%
-                                               tolower(speciesNames$LandRNames)],
-                       collapse = ", ")))
-  
-  
-  ## append species codes
-  rownames(speciesList) <- tolower(rownames(speciesList))
-  matchNames <- tolower(speciesNames[tolower(LandRNames) %in% tolower(rownames(speciesList)), LandRNames])
-  
-  speciesNames[tolower(LandRNames) %in% rownames(speciesList), species := speciesList[matchNames,2]]
-  speciesNames <- merge(speciesNames, sim$species[, c("species", "speciesCode"), with = FALSE],
-                        by = "species", all.y = TRUE)
-  
-  sim$speciesNames <- copy(speciesNames)
-  
-  ## SPECIES COEFFICIENTS ---------------------------------
-  if(!file.exists(file.path(inputPath(sim), "sppMultipliers.csv"))) {
-    sppMultipliers <- sim$dynamicBiomassFuels[(which(col1=="Fuel") + 1) : (which(col1 == "HardwoodMaximum") - 1),
-                                              col1:col2]
+  ## this is necessary in case LANDIS test tables need to be used.
+  if (!suppliedElsewhere("speciesNames", sim)) {
+    speciesNames <- data.table(LANDISNames = unique(sim$speciesTable[,LandisCode]))
+    speciesNames[, LANDISNames := tolower(gsub("\\.", "", LANDISNames))]
+    speciesNames[, LANDISNames1 := as.character(substring(LANDISNames, 1, 4))]
+    speciesNames[, LANDISNames2 := as.character(substring(LANDISNames, 5, 7))]
+    speciesNames[LANDISNames2 == "spp" | LANDISNames2 == "all", LANDISNames2:="sp"]
     
-    names(sppMultipliers) <- as.character(sppMultipliers[1,])
-    sppMultipliers <- sppMultipliers[-1]
+    speciesNames[, ':='(LandRNames = paste0(toupper(substring(LANDISNames1, 1, 1)),
+                                            tolower(as.character(substring(LANDISNames1, 2, 4))),
+                                            "_", tolower(substring(LANDISNames2, 1, 1)),
+                                            tolower(as.character(substring(LANDISNames2, 2, 3)))),
+                        LANDISNames1 = NULL,
+                        LANDISNames2 = NULL)]
+    speciesNames$LANDISNames <- substring(speciesNames$LANDISNames, 1, 7)
     
-    ## remove last character to match other tables
-    sppMultipliers[, Species := substring(Species, 1, 7)]
+    speciesList <- sim$speciesList
+    rownames(speciesList) <- sapply(strsplit(speciesList[,1], "_"), function(x) {
+      x[1] <- substring(x[1], 1, 4)
+      x[2] <-  substring(x[2], 1, 3)
+      paste(x, collapse = "_")
+    })
+    rownames(speciesList) <- sub("_spp", "_sp", rownames(speciesList))
     
-    ## merge species names and codes
-    ## keep all species, even thoe that do not match between fuels inputs and LandR tables
-    sppMultipliers <- merge(speciesNames, sppMultipliers, by.x = "LANDISNames", by.y="Species", all = TRUE)
-    sppMultipliers[, LANDISNames := NULL]
-    sppMultipliers$Coefficient <- as.numeric(sppMultipliers$Coefficient)
+    ## Check that all spp are in species traits table
+    if (any(!tolower(speciesList[,"speciesNamesEnd"]) %in% tolower(sim$species$species)))
+      warning(cat("\nFollowing selected species not found in the species traits table.\nCheck if this is correct:\n",
+                  paste0(rownames(speciesList)[!tolower(rownames(speciesList)) %in%
+                                                 tolower(speciesNames$LandRNames)],
+                         collapse = ", ")))
     
-    ## LANDIS advises keeping one for all species or values close to 1
-    sppMultipliers[is.na(Coefficient), Coefficient := 1.0]
+    ## append species codes
+    rownames(speciesList) <- tolower(rownames(speciesList))
+    matchNames <- tolower(speciesNames[tolower(LandRNames) %in% tolower(rownames(speciesList)), LandRNames])
     
-    ## exclude lines that have no spp codes
-    sppMultipliers <- sppMultipliers[, sum(is.na(.SD)) < 3, by = 1:nrow(sppMultipliers), .SDcols = 1:3] %>%
-      .$V1 %>%
-      sppMultipliers[.]
+    speciesNames[tolower(LandRNames) %in% rownames(speciesList), species := speciesList[matchNames,2]]
+    speciesNames <- merge(speciesNames, sim$species[, c("species", "speciesCode"), with = FALSE],
+                          by = "species", all.y = TRUE)
     
-    ## remove potential duplicates
-    sppMultipliers <- sppMultipliers[!duplicated(sppMultipliers)]
-    
-  } else {
-    sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
-                                 destinationPath = inputPath(sim),
-                                 fun = "read.csv", 
-                                 header = TRUE) %>%
-      data.table
+    sim$speciesNames <- copy(speciesNames)
   }
   
-  sim$sppMultipliers <- copy(sppMultipliers)
+  ## SPECIES COEFFICIENTS --------------------------------
+  sppMultipliers <- sim$sppMultipliers
   
-  ## FUEL TYPES TABLE -------------------------------------
-  if(!file.exists(file.path(inputPath(sim), "FuelTypes.csv"))) {
-    FuelTypes <- sim$dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
-                                         col1:col14]
-    ## rename columns
-    FuelTypes[1, `:=`(col3 = "minAge",
-                      col4 = "NA",
-                      col5 = "maxAge",
-                      col6 = "Species")]
-    FuelTypes[, col4 := NULL]
-    names(FuelTypes) <- c(as.character(FuelTypes[1, 1:5, with = FALSE]), paste0("Species", 2:9))
-    FuelTypes <- FuelTypes[-1]
-    
-    ## melt table to get all species in one column
-    FuelTypes <- melt(FuelTypes, id.vars = 1:4, variable.name = "Species") %>%
-      .[value != ""] %>%
-      .[, Species := value] %>%
-      .[, value := NULL]
-    
-    ## create a column with negative switch
-    ## species with a negative switch negatively contribute to a fuel type
-    FuelTypes[grepl("-", Species), negSwitch := -1L]
-    FuelTypes[is.na(negSwitch), negSwitch := 1]
-    FuelTypes[, Species := sub("-", "", Species)]
-    
-    ## remove last character to match other tables
-    FuelTypes[, Species := substring(Species, 1, 7)]
-    
-    FuelTypes <- merge(FuelTypes, speciesNames, by.x = "Species", by.y = "LANDISNames", all.y = TRUE)
-    FuelTypes[, Species := NULL]
-    
-    ## convert some columns to numeric
-    numCols <- c("minAge", "maxAge", "negSwitch")
-    FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
-    
-    sim$FuelTypes <- copy(FuelTypes)
-    
+  ## check whether spp names match LANDIS or LandR format
+  ## before merging species names and codes
+  if (any(sppMultipliers$Species %in% speciesNames$LANDISNames)) {
+    sppMultipliers <- prepSppMultipliers(sppMultipliers, data.table(species = speciesNames$species,
+                                                                    oldNames = speciesNames$LANDISNames,
+                                                                    speciesCode = speciesNames$speciesCode))
   } else {
-    FuelTypes <- prepInputs(targetFile = "FuelTypes.csv",
-                            destinationPath = inputPath(sim),
-                            fun = "utils::read.csv",
-                            header = TRUE) %>%
-      data.table
-    
-    ## remove last character to match other tables
-    FuelTypes[, Species := substring(Species, 1, 7)]
-    
-    FuelTypes <- merge(FuelTypes, speciesNames, by.x = "Species", by.y = "LANDISNames", all.y = TRUE)
-    FuelTypes[, Species := NULL]
-    
-    ## convert some columns to numeric
-    numCols <- c("minAge", "maxAge", "negSwitch")
-    FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
-    
-    sim$FuelTypes <- copy(FuelTypes)
+    if (any(sppMultipliers$Species %in% speciesNames$LandRNames)) {
+      sppMultipliers <- prepSppMultipliers(sppMultipliers, data.table(species = speciesNames$species,
+                                                                      oldNames = speciesNames$LandRNames,
+                                                                      speciesCode = speciesNames$speciesCode))
+    } else {
+      stop(paste0("Species in sppMultipliers table do not correspond",
+                  "to LANDIS nor LandR species names"))
+    }
   }
   
+  ## FUEL TYPES TABLE ---------------------------------------------
+  FuelTypes <- sim$FuelTypes
   
-  ## PIXEL FUEL TYPES TABLE ------------------------
-  ## create pixelFuelTypes table from cohorData
-  ## subset cohort data and non-na fuel types
-  pixelFuelTypes <- copy(sim$cohortData[, pixelGroup:B])
-  tempFT <- na.omit(copy(FuelTypes[, -c("FuelTypeDesc", "species", "LandRNames"), with = FALSE]))  ## keep only complete lines with spp codes
+  ## check whether spp names match LANDIS or LandR format
+  if (any(FuelTypes$Species %in% speciesNames$LANDISNames)) {
+    FuelTypes <- prepFuelTypes(FuelTypes, data.table(species = speciesNames$species,
+                                                     oldNames = speciesNames$LANDISNames,
+                                                     speciesCode = speciesNames$speciesCode))
+  } else {
+    if (any(FuelTypes$Species %in% speciesNames$LandRNames)) {
+      FuelTypes <- prepFuelTypes(FuelTypes, data.table(species = speciesNames$species,
+                                                       oldNames = speciesNames$LandRNames,
+                                                       speciesCode = speciesNames$speciesCode))
+    } else {
+      stop(paste0("Species in FuelTypes table do not correspond",
+                  "to LANDIS nor LandR species names"))
+    }
+  }
   
-  ## merge the two tables and add sppMultipliers
-  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE, nomatch = 0] %>%
-    .[order(pixelGroup)]
-  pixelFuelTypes <- sppMultipliers[!is.na(speciesCode), speciesCode:Coefficient] %>%
-    .[!duplicated(.)] %>%
-    pixelFuelTypes[., on = .(speciesCode), nomatch =0] %>%
-    .[order(pixelGroup)]
+  ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
+  ## assign NAs in fuel types with no ecoregion
+  fTypeEcoreg <- sim$fTypeEcoreg
+  fTypeEcoreg[FuelTypes[, .(FuelType)], on = "FuelType", nomatch = NA]
+  fTypeEcoreg <- fTypeEcoreg[!duplicated(fTypeEcoreg)]
   
-  sim$pixelFuelTypes <- copy(pixelFuelTypes)
+  
+  ## export to sim
+  sim$sppMultipliers <- sppMultipliers
+  sim$FuelTypes <- FuelTypes
+  sim$fTypeEcoreg <- fTypeEcoreg
   
   return(invisible(sim))
 }
 
 calcFuelTypes <- function(sim) {
+  ## PIXEL FUEL TYPES TABLE ------------------------
+  ## create pixelFuelTypes table from cohorData
+  ## subset cohort data and non-na fuel types
+  pixelFuelTypes <- copy(sim$cohortData[, pixelGroup:B])
+  tempFT <- na.omit(copy(FuelTypes[, -c("FuelTypeDesc", "species"), with = FALSE]))  ## keep only complete lines with spp codes
+  
+  ## merge the two tables
+  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE, nomatch = 0] %>%
+    .[order(pixelGroup)]
+  ## add sppMultipliers
+  pixelFuelTypes <- pixelFuelTypes[sppMultipliers[,.(speciesCode, Coefficient)], 
+                                   on = .(speciesCode), nomatch =0] %>%
+    .[order(pixelGroup)]
+  
+  ## add fuel type ecoregions
+  pixelFuelTypes <- pixelFuelTypes[fTypeEcoreg, on = .(FuelType), nomatch = 0] %>%
+    .[, ftEcoregion := as.numeric(Ecoregions)] %>%
+    .[, Ecoregions := NULL]
+  
+  
+  ## CHECK FUEL TYPES AND ECOREGIONS ------------------------------
+  ## if fuel types are ecorgeion-specific, remove fuel types
+  ## that are in wrong ecoregion
+  if (any(!is.na(pixelFuelTypes$ftEcoregion))) {
+    subsetDT <- pixelFuelTypes[!is.na(ftEcoregion)] %>%
+      .[ftEcoregion == ecoregionGroup]
+    subsetDT <- rbind(pixelFuelTypes[is.na(ftEcoregion)], subsetDT)
+    pixelFuelTypes <- subsetDT
+  }
+  
   ## CALCULATE SPP VALUES FOR EACH FUEL TYPE IN EACH PIXEL ------------------------------
-  ## calculate pixelFuelTypes per pixelGroup, ecoregion, fuel type and base fuel
+  ## calculate total biomass per pixelGroup, ecoregion and fuel type
+  ## only species contributing to a given fuel type and with appropriate age are considered
   ## species biomass is weighted by the coeff and becomes 
   ## negative if the species has a negative contribution (negSwitch) to that fuel type
-  sim$pixelFuelTypes <- sim$pixelFuelTypes %>%
-    group_by(pixelGroup, ecoregionGroup, FuelType, BaseFuel) %>%
-    filter(age>= minAge & age <= maxAge) %>%
-    summarise(fuelTypeVal = sum(B*Coefficient*negSwitch)) %>%
-    data.table()
+  cols <- c("pixelGroup", "ecoregionGroup", "FuelType")
+  pixelFuelTypes <- pixelFuelTypes[age >= minAge & age <= maxAge, 
+                                   forTypValue := sum(B*Coefficient*negSwitch),
+                                   by = cols]
   
-  ## ASSIGN FINAL FUEL TYPES BASED ON SPP VALUES ----------------------------------------
-  ## get max spp value in each pixelGroup
+  ## ASSESS DOMINANT FUEL TYPE ----------------------------------------
+  ## get max spp value (total biomass) in each pixelGroup and 
+  ## attribute corresponding fuel type in function of conifer/deciduous biomass
   cols <- c("pixelGroup", "ecoregionGroup")
-  sim$pixelFuelTypes[, maxValue := max(fuelTypeVal),
-                     by = cols]
+  pixelFuelTypes[, maxValue := max(forTypValue, na.rm = TRUE),
+                 by = cols]
   
-  sim$pixelFuelTypes[, finalFuelType := as.integer()]
-  sim$pixelFuelTypes[, finalBaseFuel := as.character()]
-  sim$pixelFuelTypes[, c("finalFuelType", "finalBaseFuel") := calcFinalFuels(BaseFuel, 
-                                                                             FuelType,
-                                                                             fuelTypeVal,
-                                                                             maxValue),
-                     by = cols]
+  pixelFuelTypes[, finalBaseFuel := as.character()]
+  pixelFuelTypes[, c("sumConifer", "sumDecid",
+                     "coniferDom", "hardwoodDom",
+                     "finalFuelType") := as.integer()]
   
-  ## CALCULATE CONIFEROUS/DECIDUOUS DOMINANCE --------------------------------------------
-  ## sum pixelFuelTypes across conifer/deciduous BaseFuels 
-  ## for each pixelGroup
-  coniferDom <- sim$pixelFuelTypes[grepl("Conifer", BaseFuel)] %>%
-    group_by(pixelGroup, ecoregionGroup) %>%
-    summarise(sumCon = sum(fuelTypeVal)) %>%
-    data.table
-  
-  deciduousDom <- sim$pixelFuelTypes[grepl("Deciduous", BaseFuel)] %>%
-    group_by(pixelGroup, ecoregionGroup) %>%
-    summarise(sumDec = sum(fuelTypeVal)) %>%
-    data.table
-  
-  ## merge
-  cols <- c("pixelGroup", "ecoregionGroup")
-  sim$pixelFuelTypes <- merge(coniferDom, deciduousDom, by = cols, all = TRUE) %>%
-    merge(sim$pixelFuelTypes, ., by = cols)
-  
-  ## ConiferPlantation, Open and Slash have their own rules for conifer/deciduos
-  ## dominance, so sumCon and sumDec need to be overriden 
-  cols <- c("sumCon", "sumDec")
-  sim$pixelFuelTypes[finalBaseFuel == "ConiferPlantation", 
-                     (cols) := list(100, 0)]
-  sim$pixelFuelTypes[finalBaseFuel == "Slash", 
-                     (cols) := list(0, 0)]
-  sim$pixelFuelTypes[finalBaseFuel == "Open", 
-                     (cols) := list(0, 0)]
-  
-  ## For Conifer and Deciduous, the conifer vs hardwood dominance
-  ## are calculated for each as their percent dominance + 0.5
-  ## NOTE: this != LANDIS source code, but approaches the idea of the manual
-  ## replace NAs by zeros
-  sim$pixelFuelTypes[is.na(sumCon), sumCon := 0]
-  sim$pixelFuelTypes[is.na(sumDec), sumDec := 0]
-  
-  sim$pixelFuelTypes[, c("coniferDom", "hardwoodDom", "finalBaseFuel") := calcDominance(sumCon, sumDec, finalBaseFuel, P(sim)$hardwoodMax),
-                     by = 1:nrow(sim$pixelFuelTypes)]
+  pixelFuelTypes[, c("sumConifer", "sumDecid",
+                     "coniferDom", "hardwoodDom",
+                     "finalBaseFuel", "finalFuelType") := calcFinalFuels(BaseFuel, FuelType,
+                                                                         forTypValue, maxValue,
+                                                                         P(sim)$hardwoodMax),
+                 by = cols]
+  ## remove unnecessary columns and export to sim
+  pixelFuelTypes <- cbind(pixelFuelTypes[, .(pixelGroup, ecoregionGroup)],
+                          pixelFuelTypes[, finalBaseFuel:finalFuelType]) %>%
+    .[!duplicated(.)]
+  sim$pixelFuelTypes <- copy(pixelFuelTypes)
   
   return(invisible(sim))
 }
 
 .inputObjects <- function(sim) {
   dPath <- dataPath(sim) 
-  
-  if(!suppliedElsewhere("speciesTable", sim)) {
-    sim$speciesTable <- prepInputs("speciesTraits.csv", 
-                                   destinationPath = dPath,
-                                   url = extractURL("speciesTable"),
-                                   fun = "utils::read.csv", 
-                                   header = TRUE, stringsAsFactors = FALSE) %>%
-      data.table()
-  }
-  
-  ## Get LANDIS test parameters, to use if others
-  ## haven't been supplied in <module>/inputs
-  
-  if(!suppliedElsewhere("dynamicBiomassFuels", sim)) {
-    maxcol <- 21 #max(count.fields(file.path(getPaths()$inputPath, "dynamic-biomass-fuels.txt"), sep = ""))
+  ## Get LANDIS example parameters -----------------------
+  ## to use if others haven't been supplied in <module>/inputs
+  if (any(!suppliedElsewhere("sppMultipliers", sim),
+          !suppliedElsewhere("FuelTypes", sim),
+          !suppliedElsewhere("fTypeEcoreg", sim))) {
+    maxcol <- 21 #max(count.fields(file.path(getPaths()$dataPath, "dynamic-biomass-fuels.txt"), sep = ""))
     dynamicBiomassFuels <- prepInputs(targetFile = "dynamic-biomass-fuels.txt", 
                                       url = extractURL("dynamicBiomassFuels", sim), 
                                       destinationPath = dataPath(sim),
@@ -355,10 +292,108 @@ calcFuelTypes <- function(sim) {
     dynamicBiomassFuels[col1 == "Fuel" & col2 == "Type"] <- data.table(dynamicBiomassFuels[col1 == "Fuel" & col2 == "Type", col2:col14], 
                                                                        col14 = "NA")
     dynamicBiomassFuels[col1 == "Type", col1 := "FuelType"] 
-    
-    sim$dynamicBiomassFuels <- copy(dynamicBiomassFuels) 
+  }
+  
+  ## SPECIES TRATIS TABLE ---------------------------------
+  if (!suppliedElsewhere("speciesTable", sim)) {
+    sim$speciesTable <- prepInputs("speciesTraits.csv", 
+                                   destinationPath = dPath,
+                                   url = extractURL("speciesTable"),
+                                   fun = "utils::read.csv", 
+                                   header = TRUE, stringsAsFactors = FALSE) %>%
+      data.table()
+  }
+  
+  ## SPECIES COEFFICIENTS ---------------------------------
+  if (!suppliedElsewhere("sppMultipliers", sim)) {
+    if (file.exists(file.path(dataPath(sim), "sppMultipliers.csv"))) {
+      sim$sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
+                                       destinationPath = dataPath(sim),
+                                       fun = "read.csv", 
+                                       header = TRUE) %>%
+        data.table()
+    } else {
+      message(paste0("Can't find sppMultipliers.csv in ", dataPath(sim),
+                     ".\nUsing LANDIS example file"))
+      
+      sppMultipliers <- dynamicBiomassFuels[(which(col1=="Fuel") + 1) : (which(col1 == "HardwoodMaximum") - 1),
+                                            col1:col2]
+      
+      names(sppMultipliers) <- as.character(sppMultipliers[1,])
+      sppMultipliers <- sppMultipliers[-1]
+      
+      ## remove last character to match other tables
+      sppMultipliers[, Species := substring(Species, 1, 7)]
+      
+      sim$sppMultipliers <- copy(sppMultipliers)
+    }
+  }
+  
+  ## FUEL TYPES TABLE -------------------------------------
+  if (!suppliedElsewhere("FuelTypes", sim)) {
+    if (file.exists(file.path(dataPath(sim), "FuelTypes.csv"))) {
+      sim$FuelTypes <- prepInputs(targetFile = "FuelTypes.csv",
+                                  destinationPath = dataPath(sim),
+                                  fun = "utils::read.csv",
+                                  header = TRUE) %>%
+        data.table
+      
+      ## remove last character to match other tables
+      sim$FuelTypes[, Species := substring(Species, 1, 7)]
+    } else {
+      message(paste0("Can't find FuelTypes.csv in ", dataPath(sim),
+                     ".\nUsing LANDIS example file"))
+      
+      FuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
+                                       col1:col14]
+      ## rename columns
+      FuelTypes[1, `:=`(col3 = "minAge",
+                        col4 = "NA",
+                        col5 = "maxAge",
+                        col6 = "Species")]
+      FuelTypes[, col4 := NULL]
+      names(FuelTypes) <- c(as.character(FuelTypes[1, 1:5, with = FALSE]), paste0("Species", 2:9))
+      FuelTypes <- FuelTypes[-1]
+      
+      ## melt table to get all species in one column
+      FuelTypes <- melt(FuelTypes, id.vars = 1:4, variable.name = "Species") %>%
+        .[value != ""] %>%
+        .[, Species := value] %>%
+        .[, value := NULL]
+      
+      ## create a column with negative switch
+      ## species with a negative switch negatively contribute to a fuel type
+      FuelTypes[grepl("-", Species), negSwitch := -1L]
+      FuelTypes[is.na(negSwitch), negSwitch := 1]
+      FuelTypes[, Species := sub("-", "", Species)]
+      
+      ## remove last character to match other tables
+      FuelTypes[, Species := substring(Species, 1, 7)]
+      
+      ## export table to sim
+      sim$FuelTypes <- copy(FuelTypes)
+    }
+  }
+  
+  ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
+  if (!suppliedElsewhere("fTypeEcoreg", sim)) {
+    if (file.exists(file.path(dataPath(sim), "fTypesEcoregions.csv"))) {
+      sim$fTypeEcoreg <- prepInputs(targetFile = "fTypesEcoregions.csv",
+                                    destinationPath = dataPath(sim),
+                                    fun = "utils::read.csv",
+                                    header = TRUE) %>%
+        data.table
+      
+    } else {
+      message(paste0("Can't find fTypesEcoregions.csv in ", dataPath(sim),
+                     ".\nUsing LANDIS example file"))
+      ## in the LANDIS test exeamples this feature is turned off and the
+      ## ecoregions do not correspond to those in the succession module examples.
+      ## assigning NAs for ecoregion sin all fuel types to simualte this behaviour
+      fTypeEcoreg <- data.table(FuelType = sort(unique(FuelTypes$FuelType)), Ecoregions = NA)
+      sim$fTypeEcoreg <- fTypeEcoreg
+    }
   }
   
   return(invisible(sim))
-}
-
+} 
