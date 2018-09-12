@@ -1,0 +1,4 @@
+"file" "checksum" "filesize" "algorithm"
+"dynamic-biomass-fuels.txt" "5ae1438a55268929" "1784" "xxhash64"
+"FuelTypes.csv" "9bf9d0080ded4303" "3420" "xxhash64"
+"speciesTraits.csv" "155e633022e134cf" "9994" "xxhash64"
