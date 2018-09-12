@@ -273,7 +273,9 @@ calcFuelTypes <- function(sim) {
           !suppliedElsewhere("fTypeEcoreg", sim))) {
     maxcol <- 21 #max(count.fields(file.path(getPaths()$dataPath, "dynamic-biomass-fuels.txt"), sep = ""))
     dynamicBiomassFuels <- prepInputs(targetFile = "dynamic-biomass-fuels.txt", 
-                                      url = extractURL("dynamicBiomassFuels", sim), 
+                                      url = paste0("https://raw.githubusercontent.com/CeresBarros/",
+                                                   "Extension-Dynamic-Biomass-Fuels/master/testings/",
+                                                   "version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"), 
                                       destinationPath = dataPath(sim),
                                       fun = "utils::read.table", 
                                       fill = TRUE, row.names = NULL,
