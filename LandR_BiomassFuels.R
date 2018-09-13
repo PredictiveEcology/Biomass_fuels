@@ -251,7 +251,6 @@ calcFuelTypes <- function(sim) {
   pixelFuelTypes[, c("sumConifer", "sumDecid",
                      "coniferDom", "hardwoodDom",
                      "finalFuelType") := as.integer()]
-  
   pixelFuelTypes[, c("sumConifer", "sumDecid",
                      "coniferDom", "hardwoodDom",
                      "finalBaseFuel", "finalFuelType") := calcFinalFuels(BaseFuel, FuelType,
@@ -275,18 +274,18 @@ calcFuelTypes <- function(sim) {
           !suppliedElsewhere("FuelTypes", sim),
           !suppliedElsewhere("fTypeEcoreg", sim))) {
     maxcol <- 21 #max(count.fields(file.path(getPaths()$dataPath, "dynamic-biomass-fuels.txt"), sep = ""))
-    dynamicBiomassFuels <- prepInputs(targetFile = "dynamic-biomass-fuels.txt", 
-                                      url = paste0("https://raw.githubusercontent.com/CeresBarros/",
-                                                   "Extension-Dynamic-Biomass-Fuels/master/testings/",
-                                                   "version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"), 
-                                      destinationPath = dataPath(sim),
-                                      fun = "utils::read.table", 
-                                      fill = TRUE, row.names = NULL,
-                                      sep = "",
-                                      header = FALSE,
-                                      blank.lines.skip = TRUE,
-                                      col.names = c(paste("col",1:maxcol, sep = "")),
-                                      stringsAsFactors = FALSE)
+    dynamicBiomassFuels <- Cache(prepInputs,targetFile = "dynamic-biomass-fuels.txt", 
+                                 url = paste0("https://raw.githubusercontent.com/CeresBarros/",
+                                              "Extension-Dynamic-Biomass-Fuels/master/testings/",
+                                              "version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"), 
+                                 destinationPath = dataPath(sim),
+                                 fun = "utils::read.table", 
+                                 fill = TRUE, row.names = NULL,
+                                 sep = "",
+                                 header = FALSE,
+                                 blank.lines.skip = TRUE,
+                                 col.names = c(paste("col",1:maxcol, sep = "")),
+                                 stringsAsFactors = FALSE)
     dynamicBiomassFuels <- data.table(dynamicBiomassFuels[, 1:15])
     dynamicBiomassFuels <- dynamicBiomassFuels[!(col1 %in% c("LandisData", "Timestep", "MapFileNames",
                                                              "PctConiferFileName", "PctDeadFirFileName"))]

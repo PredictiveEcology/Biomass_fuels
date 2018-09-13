@@ -17,12 +17,14 @@ calcFinalFuels <- function(BaseFuel, FuelType,
   tempDT <- tempDT[!duplicated(tempDT)]
   
   ## CALCULATE CONIFEROUS/DECIDUOUS DOMINANCE ----
-  ## sum pixelFuelTypes across conifer/deciduous BaseFuels 
-  ## for each pixelGroup
-  ## add "mixed" biomass to both
+  ## sum biomass across conifer/deciduos fuel types in each 
+  ## pixelGroup. Add "mixed" biomass to both
   sumConifer <- sum(tempDT[grepl("Conifer|Mixed", BaseFuel), forTypValue], na.rm = TRUE)
   sumDecid <- sum(tempDT[grepl("Deciduous|Mixed", BaseFuel), forTypValue], na.rm = TRUE)
   
+  ## DETERMINE DOMINANT FUEL TYPES PER BASE FUEL
+  ## NOTE: if several fuel types have the maximum biomass
+  ## for a given base fuel, they'll win based on table order
   ## determine the dominant conifer fuel type
   if (any(grepl("Conifer", tempDT$BaseFuel))) {
     coniferMaxValue <- max(tempDT[grepl("Conifer", BaseFuel), forTypValue], na.rm = TRUE)
@@ -31,6 +33,8 @@ calcFinalFuels <- function(BaseFuel, FuelType,
       unique()
     if (!length(coniferFT))
       coniferFT <- as.character("NA")
+    if (length(coniferFT) > 1)
+      coniferFT <- tail(coniferFT, 1)
   } else  {
     coniferFT <- as.character("NA")
     coniferMaxValue <- 0
@@ -43,6 +47,8 @@ calcFinalFuels <- function(BaseFuel, FuelType,
     coniferFT <- tempDT[grepl("Plantation", BaseFuel)] %>%
       .[forTypValue == coniferPlantMaxValue, FuelType] %>%
       unique()
+    if (length(coniferFT) > 1)
+      coniferFT <- tail(coniferFT, 1)
   } else 
     coniferPlantMaxValue <- 0
   
@@ -54,6 +60,8 @@ calcFinalFuels <- function(BaseFuel, FuelType,
       unique()
     if (!length(decidFT))
       decidFT <- as.character("NA")
+    if (length(decidFT) > 1)
+      decidFT <- tail(decidFT, 1)
   } else {
     decidFT <- as.character("NA") 
     decidMaxValue <- 0
@@ -66,6 +74,8 @@ calcFinalFuels <- function(BaseFuel, FuelType,
       unique()
     if (!length(mixedFT))
       mixedFT <- as.character("NA")
+    if (length(mixedFT) > 1)
+      mixedFT <- tail(mixedFT, 1)
   } else {
     mixedFT <- as.character("NA") 
     mixedMaxValue <- 0
@@ -79,6 +89,8 @@ calcFinalFuels <- function(BaseFuel, FuelType,
       unique()
     if (!length(slashFT))
       slashFT <- as.character("NA")
+    if (length(slashFT) > 1)
+      slashFT <- tail(slashFT, 1)
   } else {
     slashFT <- as.character("NA") 
     slashMaxValue <- 0
@@ -92,6 +104,8 @@ calcFinalFuels <- function(BaseFuel, FuelType,
       unique()
     if (!length(openFT))
       openFT <- as.character("NA")
+    if (length(openFT) > 1)
+      openFT <- tail(openFT, 1)
   } else {
     openFT <- as.character("NA") 
     openMaxValue <- 0
