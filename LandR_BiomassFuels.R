@@ -239,6 +239,8 @@ calcFuelTypes <- function(sim) {
   pixelFuelTypes <- pixelFuelTypes[age >= minAge & age <= maxAge, 
                                    forTypValue := sum(B*Coefficient*negSwitch),
                                    by = cols]
+  ## remove lines that have no biomass for a fuel
+  pixelFuelTypes <- pixelFuelTypes[!is.na(forTypValue)]
   
   ## ASSESS DOMINANT FUEL TYPE ----------------------------------------
   ## get max spp value (total biomass) in each pixelGroup and 

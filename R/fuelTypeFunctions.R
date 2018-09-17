@@ -6,7 +6,6 @@
 ## this function returns the fuel and base type that had the highest sppValue in a pixel
 ## note that there is no "Mixed" fuel type in LANDIS, as it becomes either conifer or deciduous and 
 ## the biomass of conifers and deciduous cohorts is used later when necessary (e.g. fire spread/severity)
-## here, the "mixed" fuel type is initially included, but then becomes conifer/deciduous
 
 calcFinalFuels <- function(BaseFuel, FuelType,
                            forTypValue, maxValue,
@@ -16,11 +15,17 @@ calcFinalFuels <- function(BaseFuel, FuelType,
                        forTypValue = forTypValue, maxValue = maxValue)
   tempDT <- tempDT[!duplicated(tempDT)]
   
+  ## ignore "mixed" fuel type
+  tempDT <- tempDT[BaseFuel != "Mixed"]
+  
   ## CALCULATE CONIFEROUS/DECIDUOUS DOMINANCE ----
   ## sum biomass across conifer/deciduos fuel types in each 
-  ## pixelGroup. Add "mixed" biomass to both
-  sumConifer <- sum(tempDT[grepl("Conifer|Mixed", BaseFuel), forTypValue], na.rm = TRUE)
-  sumDecid <- sum(tempDT[grepl("Deciduous|Mixed", BaseFuel), forTypValue], na.rm = TRUE)
+  ## (the first option could be a way to account for mixed types?)
+  # sumConifer <- sum(tempDT[grepl("Conifer|Mixed", BaseFuel), forTypValue], na.rm = TRUE)
+  # sumDecid <- sum(tempDT[grepl("Deciduous|Mixed", BaseFuel), forTypValue], na.rm = TRUE)
+  sumConifer <- sum(tempDT[grepl("Conifer", BaseFuel), forTypValue], na.rm = TRUE)
+  sumDecid <- sum(tempDT[grepl("Deciduous", BaseFuel), forTypValue], na.rm = TRUE)
+  
   
   ## DETERMINE DOMINANT FUEL TYPES PER BASE FUEL
   ## NOTE: if several fuel types have the maximum biomass
@@ -67,19 +72,19 @@ calcFinalFuels <- function(BaseFuel, FuelType,
     decidMaxValue <- 0
   }
   
-  if (any(grepl("Mixed", tempDT$BaseFuel))) {
-    mixedMaxValue <- max(tempDT[grepl("Mixed", BaseFuel), forTypValue], na.rm = TRUE)
-    mixedFT <- tempDT[grepl("Mixed", BaseFuel)] %>%
-      .[forTypValue == mixedMaxValue, FuelType] %>%
-      unique()
-    if (!length(mixedFT))
-      mixedFT <- as.character("NA")
-    if (length(mixedFT) > 1)
-      mixedFT <- tail(mixedFT, 1)
-  } else {
-    mixedFT <- as.character("NA") 
-    mixedMaxValue <- 0
-  }
+  # if (any(grepl("Mixed", tempDT$BaseFuel))) {
+  #   mixedMaxValue <- max(tempDT[grepl("Mixed", BaseFuel), forTypValue], na.rm = TRUE)
+  #   mixedFT <- tempDT[grepl("Mixed", BaseFuel)] %>%
+  #     .[forTypValue == mixedMaxValue, FuelType] %>%
+  #     unique()
+  #   if (!length(mixedFT))
+  #     mixedFT <- as.character("NA")
+  #   if (length(mixedFT) > 1)
+  #     mixedFT <- tail(mixedFT, 1)
+  # } else {
+  #   mixedFT <- as.character("NA") 
+  #   mixedMaxValue <- 0
+  # }
   
   ## determine the dominant slash fuel type
   if (any(grepl("Slash", tempDT$BaseFuel))) {
@@ -111,11 +116,12 @@ calcFinalFuels <- function(BaseFuel, FuelType,
     openMaxValue <- 0
   }
   
-  tempDT2 <- data.table(finalFuelType = c(coniferFT, coniferFT, decidFT, mixedFT, slashFT, openFT),
-                        maxValueFT = c(coniferMaxValue, coniferPlantMaxValue, decidMaxValue, 
-                                       mixedMaxValue, slashMaxValue, openMaxValue), 
-                        finalBaseFuel = c("Conifer", "ConiferPlantation", "Deciduous",
-                                          "Mixed", "Slash", "Open")) 
+  tempDT2 <- data.table(finalFuelType = c(coniferFT, coniferFT, decidFT, #mixedFT, 
+                                          slashFT, openFT),
+                        maxValueFT = c(coniferMaxValue, coniferPlantMaxValue, decidMaxValue, #mixedMaxValue, 
+                                       slashMaxValue, openMaxValue), 
+                        finalBaseFuel = c("Conifer", "ConiferPlantation", "Deciduous",#"Mixed",
+                                          "Slash", "Open")) 
   
   ## DETERMINE FINAL FUEL TYPE FOR ALL BUT CONIFER AND DECIDUOUS -----
   ## get the fuel type with the maximum biomass. When there are ties, 
@@ -154,8 +160,6 @@ calcFinalFuels <- function(BaseFuel, FuelType,
     }
   }
   
-  
-  
   ## calculate conifer & hardwood dominance and
   ## resolve dominant fuel type and ajust dominance accordingly
   if (sumConifer > 0 | sumDecid > 0) {
@@ -180,7 +184,7 @@ calcFinalFuels <- function(BaseFuel, FuelType,
     }
   }
   
-  list(sumConifer = as.integer(sumConifer), sumDecid = as.integer(sumDecid), 
-       coniferDom = as.integer(coniferDom), hardwoodDom = as.integer(hardwoodDom), 
-       finalBaseFuel = as.character(finalBaseFuel), finalFuelType = as.integer(finalFuelType))
+  test <- list(sumConifer = as.integer(sumConifer), sumDecid = as.integer(sumDecid), 
+               coniferDom = as.integer(coniferDom), hardwoodDom = as.integer(hardwoodDom), 
+               finalBaseFuel = as.character(finalBaseFuel), finalFuelType = as.integer(finalFuelType))
 }
