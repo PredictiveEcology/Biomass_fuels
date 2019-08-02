@@ -64,27 +64,17 @@ doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
       # do stuff for this event
       sim <- fuelsInit(sim)
 
-      # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$fireInitialTime,
-                           "Biomass_fuels", "doPrepareInputTables", eventPriority = 1)
-      sim <- scheduleEvent(sim, P(sim)$fireInitialTime,
-                           "Biomass_fuels", "doFuelTypes", eventPriority = 1.5)
+                           "Biomass_fuels", "doFuelTypes", eventPriority = 1)
     },
-    doPrepareInputTables = {
-      # do stuff for this event
-      sim <- prepareInputTables(sim)
 
-      # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim) + P(sim)$fireTimestep,
-                           "Biomass_fuels", "doPrepareInputTables", eventPriority = 1)
-    },
     doFuelTypes = {
       # do stuff for this event
       sim <- calcFuelTypes(sim)
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, time(sim) + P(sim)$fireTimestep,
-                           "Biomass_fuels", "doFuelTypes",  eventPriority = 1.5)
+                           "Biomass_fuels", "doFuelTypes",  eventPriority = 1)
     },
     warning(paste("Undefined event type: '", current(sim)[1, "eventType", with = FALSE],
                   "' in module '", current(sim)[1, "moduleName", with = FALSE], "'", sep = ""))
@@ -94,38 +84,24 @@ doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
 
 ### template initialization
 fuelsInit <- function(sim) {
-  ## no module initalisation necessary
-  return(invisible(sim))
-}
-
-prepareInputTables <- function(sim) {
   ## SPECIES COEFFICIENTS --------------------------------
   sppMultipliers <- copy(sim$sppMultipliers)
-
-  ## prep table for the first time
-  if (time(sim) == (start(sim) + P(sim)$fireTimestep)) {
-    sppMultipliers <- prepSppMultipliers(sppMultipliers,
-                                         sppEquiv = sim$sppEquiv,
-                                         sppEquivCol = P(sim)$sppEquivCol)
-  }
+  sppMultipliers <- prepSppMultipliers(sppMultipliers,
+                                       sppEquiv = sim$sppEquiv,
+                                       sppEquivCol = P(sim)$sppEquivCol)
 
   ## FUEL TYPES TABLE ---------------------------------------------
   FuelTypes <- copy(sim$FuelTypes)
+  FuelTypes <- prepFuelTypes(FuelTypes,
+                             sppEquiv = sim$sppEquiv,
+                             sppEquivCol = P(sim)$sppEquivCol)
 
-  ## prep table for the first time
-  if (time(sim) == (start(sim) + P(sim)$fireTimestep)) {
-    FuelTypes <- prepFuelTypes(FuelTypes,
-                               sppEquiv = sim$sppEquiv,
-                               sppEquivCol = P(sim)$sppEquivCol)
-
-  }
 
   ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
   ## assign NAs in fuel types with no ecoregion
   fTypeEcoreg <- copy(sim$fTypeEcoreg)
   fTypeEcoreg[FuelTypes[, .(FuelType)], on = "FuelType", nomatch = NA]
   fTypeEcoreg <- fTypeEcoreg[!duplicated(fTypeEcoreg)]
-
 
   ## export to sim
   sim$sppMultipliers <- sppMultipliers
