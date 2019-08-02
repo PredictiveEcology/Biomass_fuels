@@ -18,8 +18,12 @@ defineModule(sim, list(
   reqdPkgs = list("data.table", "dplyr",
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
-                  "CeresBarros/reproducible@development"),
+                  "PredictiveEcology/reproducible@development"),
   parameters = rbind(
+    defineParameter("fireInitialTime", "numeric", NA,
+                    desc = "The event time that the first fire disturbance event occurs"),
+    defineParameter("fireTimestep", "numeric", NA,
+                    desc = "The number of time units between successive fire events in a fire module"),
     defineParameter(name = "hardwoodMax", class = "numeric", default = 15L,
                     desc = "Threshold of percent biomass below which fuel types are considered conifer or mixed.
                     Defaults to 15, as in LANDIS example file"),
@@ -27,20 +31,11 @@ defineModule(sim, list(
                     "The column in sim$specieEquivalency data.table to use as a naming convention"),
     defineParameter(".useCache", "logical", "init", NA, NA,
                     desc = "use caching for the spinup simulation?")
-    ),
+  ),
   inputObjects = bind_rows(
-    expectsInput(objectName = "speciesList", objectClass = c("character", "matrix"),
-                 desc = "vector or matrix of species to select, provided by the user or BiomassSpeciesData.
-                 If a matrix, should have two columns of raw and 'end' species names", sourceURL = NA),
     expectsInput(objectName = "cohortData", objectClass = "data.table",
                  desc = "age cohort-biomass table hooked to pixel group map by pixelGroupIndex at
                  succession time step", sourceURL = NA),
-    expectsInput(objectName = "species", objectClass = "data.table",
-                 desc = "Species table produced by LandR-Biomass that has species traits such as longevity...",
-                 sourceURL = NA),
-    expectsInput(objectName = "speciesTable", objectClass = "data.table",
-                 desc = "species attributes table, default is from Dominic and Yan's project",
-                 sourceURL = "https://raw.githubusercontent.com/dcyr/LANDIS-II_IA_generalUseFiles/master/speciesTraits.csv"),
     expectsInput(objectName = "sppMultipliers", objectClass = "data.table",
                  desc = "Table of species biomass coefficient weights.
                  Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
@@ -51,15 +46,16 @@ defineModule(sim, list(
                  Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
     expectsInput(objectName = "fTypeEcoreg", objectClass = "data.table",
                  desc = "Table of Fuel Types per Ecoregion (optional, see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
-                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")
-    ),
+                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
+    expectsInput(objectName = "sppEquiv", objectClass = "data.table",
+                 desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
+                 sourceURL = "")
+  ),
   outputObjects = bind_rows(
-    createsOutput(objectName = "speciesNames", objectClass = "data.table",
-                  desc = "Table of species names/codes correspondences between LANDIS and LandR"),
     createsOutput(objectName = "pixelFuelTypes", objectClass = "data.table",
                   desc = "Fuel types per pixel group, calculated from cohort biomasses")
   )
-    ))
+))
 
 doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
   switch(
@@ -69,9 +65,9 @@ doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
       sim <- fuelsInit(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
+      sim <- scheduleEvent(sim, P(sim)$fireInitialTime,
                            "Biomass_fuels", "doPrepareInputTables", eventPriority = 1)
-      sim <- scheduleEvent(sim, start(sim) + sim@params$LBMR$successionTimestep,
+      sim <- scheduleEvent(sim, P(sim)$fireInitialTime,
                            "Biomass_fuels", "doFuelTypes", eventPriority = 1.5)
     },
     doPrepareInputTables = {
@@ -79,7 +75,7 @@ doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
       sim <- prepareInputTables(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim) + sim@params$LBMR$successionTimestep,
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$fireTimestep,
                            "Biomass_fuels", "doPrepareInputTables", eventPriority = 1)
     },
     doFuelTypes = {
@@ -87,7 +83,7 @@ doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
       sim <- calcFuelTypes(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, time(sim) + sim@params$LBMR$successionTimestep,
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$fireTimestep,
                            "Biomass_fuels", "doFuelTypes",  eventPriority = 1.5)
     },
     warning(paste("Undefined event type: '", current(sim)[1, "eventType", with = FALSE],
@@ -104,34 +100,29 @@ fuelsInit <- function(sim) {
 
 prepareInputTables <- function(sim) {
   ## SPECIES COEFFICIENTS --------------------------------
-  sppMultipliers <- sim$sppMultipliers
+  sppMultipliers <- copy(sim$sppMultipliers)
 
-  ## change species names
-  if (time(sim) == (start(sim) + sim@params$LBMR$successionTimestep)) {
-    sppMultipliers[, Species := equivalentName(Species, sim$sppEquiv, column = P(sim)$sppEquivCol)]
-    setnames(sppMultipliers, "Species", "speciesCode")
-    if (all(is.na(sppMultipliers$speciesCode))) {
-      stop(paste("Species in sppMultipliers table do not correspond",
-                 "to LANDIS nor LandR species names"))
-    }
+  ## prep table for the first time
+  if (time(sim) == (start(sim) + P(sim)$fireTimestep)) {
+    sppMultipliers <- prepSppMultipliers(sppMultipliers,
+                                         sppEquiv = sim$sppEquiv,
+                                         sppEquivCol = P(sim)$sppEquivCol)
   }
 
   ## FUEL TYPES TABLE ---------------------------------------------
-  FuelTypes <- sim$FuelTypes
+  FuelTypes <- copy(sim$FuelTypes)
 
-  ## change species names
-  if (time(sim) == (start(sim) + sim@params$LBMR$successionTimestep)) {
-    FuelTypes[, Species := equivalentName(Species, sim$sppEquiv, column = P(sim)$sppEquivCol)]
-    setnames(FuelTypes, "Species", "speciesCode")
-    if (all(is.na(FuelTypes$speciesCode))) {
-      stop(paste("Species in FuelTypes table do not correspond",
-                 "to LANDIS nor LandR species names"))
-    }
+  ## prep table for the first time
+  if (time(sim) == (start(sim) + P(sim)$fireTimestep)) {
+    FuelTypes <- prepFuelTypes(FuelTypes,
+                               sppEquiv = sim$sppEquiv,
+                               sppEquivCol = P(sim)$sppEquivCol)
+
   }
 
   ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
   ## assign NAs in fuel types with no ecoregion
-  fTypeEcoreg <- sim$fTypeEcoreg
+  fTypeEcoreg <- copy(sim$fTypeEcoreg)
   fTypeEcoreg[FuelTypes[, .(FuelType)], on = "FuelType", nomatch = NA]
   fTypeEcoreg <- fTypeEcoreg[!duplicated(fTypeEcoreg)]
 
@@ -246,16 +237,6 @@ calcFuelTypes <- function(sim) {
     dynamicBiomassFuels[col1 == "Type", col1 := "FuelType"]
   }
 
-  ## SPECIES TRATIS TABLE ---------------------------------
-  if (!suppliedElsewhere("speciesTable", sim)) {
-    sim$speciesTable <- prepInputs("speciesTraits.csv",
-                                   destinationPath = dPath,
-                                   url = extractURL("speciesTable"),
-                                   fun = "utils::read.csv",
-                                   header = TRUE, stringsAsFactors = FALSE)
-    sim$speciesTable <- data.table(sim$speciesTable)
-  }
-
   ## SPECIES COEFFICIENTS ---------------------------------
   if (!suppliedElsewhere("sppMultipliers", sim)) {
     if (file.exists(file.path(dataPath(sim), "sppMultipliers.csv"))) {
@@ -340,6 +321,26 @@ calcFuelTypes <- function(sim) {
       fTypeEcoreg <- data.table(FuelType = sort(unique(sim$FuelTypes$FuelType)), Ecoregions = NA)
       sim$fTypeEcoreg <- fTypeEcoreg
     }
+  }
+
+
+  ## SPECIES EQUIVALENCY TABLE ---------------------------
+  if (!suppliedElsewhere("sppEquiv", sim)) {
+    if (!is.null(sim$sppColorVect))
+      stop("If you provide sppColorVect, you MUST also provide sppEquiv")
+
+    data("sppEquivalencies_CA", package = "LandR", envir = environment())
+    sim$sppEquiv <- as.data.table(sppEquivalencies_CA)
+
+    ## By default, Abies_las is renamed to Abies_sp
+    sim$sppEquiv[KNN == "Abie_Las", LandR := "Abie_sp"]
+
+    ## add default colors for species used in model
+    sim$sppColorVect <- sppColors(sim$sppEquiv, P(sim)$sppEquivCol,
+                                  newVals = "Mixed", palette = "Accent")
+  } else {
+    if (is.null(sim$sppColorVect))
+      stop("If you provide sppEquiv please provide sppColorVect")
   }
 
   return(invisible(sim))

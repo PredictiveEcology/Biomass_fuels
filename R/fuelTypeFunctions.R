@@ -184,7 +184,7 @@ calcFinalFuels <- function(BaseFuel, FuelType,
     }
   }
 
-  test <- list(sumConifer = as.integer(sumConifer), sumDecid = as.integer(sumDecid),
-               coniferDom = as.integer(coniferDom), hardwoodDom = as.integer(hardwoodDom),
-               finalBaseFuel = as.character(finalBaseFuel), finalFuelType = as.integer(finalFuelType))
+  list(sumConifer = as.integer(sumConifer), sumDecid = as.integer(sumDecid),
+       coniferDom = as.integer(coniferDom), hardwoodDom = as.integer(hardwoodDom),
+       finalBaseFuel = as.character(finalBaseFuel), finalFuelType = as.integer(finalFuelType))
 }
