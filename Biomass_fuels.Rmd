@@ -1,5 +1,5 @@
 ---
-title: "LandR_BiomassFuels"
+title: "Biomass_fuels"
 author: ""
 date: "26 July 2018"
 output: pdf_document
@@ -34,7 +34,7 @@ parameters <- list(
   #module1 = list(param1 = value1, param2 = value2),
   #module2 = list(param1 = value1, param2 = value2)
 )
-modules <- list("LandR_BiomassFuels")
+modules <- list("Biomass_fuels")
 objects <- list()
 inputs <- list()
 outputs <- list()
