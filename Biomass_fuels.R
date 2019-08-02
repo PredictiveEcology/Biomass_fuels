@@ -148,7 +148,6 @@ calcFuelTypes <- function(sim) {
   ## PIXEL FUEL TYPES TABLE ------------------------
   ## create pixelFuelTypes table from cohorData
   ## subset cohort data and non-na fuel types
-  browser()
   pixelFuelTypes <- sim$cohortData[, .(speciesCode, pixelGroup, ecoregionGroup, age, B)]
   tempFT <- na.omit(copy(sim$FuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
 
