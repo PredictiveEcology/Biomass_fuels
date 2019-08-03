@@ -6,8 +6,7 @@ defineModule(sim, list(
   name = "Biomass_fuels",
   description = "SpaDES version of the LANDIS-II Dynamic Biomass Fuels Extention v2.2 - 15 Jun 2017", #"insert module description here",
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"),
-  authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca",
-                   role = c("aut", "cre")),
+  authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
   version = numeric_version("0.0.1"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
@@ -193,7 +192,7 @@ calcFuelTypes <- function(sim) {
                                  url = paste0("https://raw.githubusercontent.com/CeresBarros/",
                                               "Extension-Dynamic-Biomass-Fuels/master/testings/",
                                               "version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
-                                 destinationPath = dataPath(sim),
+                                 destinationPath = dPath,
                                  fun = "utils::read.table",
                                  fill = TRUE, row.names = NULL,
                                  sep = "",
@@ -215,9 +214,9 @@ calcFuelTypes <- function(sim) {
 
   ## SPECIES COEFFICIENTS ---------------------------------
   if (!suppliedElsewhere("sppMultipliers", sim)) {
-    if (file.exists(file.path(dataPath(sim), "sppMultipliers.csv"))) {
+    if (file.exists(file.path(dPath, "sppMultipliers.csv"))) {
       sim$sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
-                                       destinationPath = dataPath(sim),
+                                       destinationPath = dPath,
                                        fun = "read.csv",
                                        header = TRUE)
       sim$sppMultipliers <- data.table(sim$sppMultipliers)
@@ -226,7 +225,7 @@ calcFuelTypes <- function(sim) {
       sim$sppMultipliers[, Coefficient := as.numeric(Coefficient)]
 
     } else {
-      message(paste0("Can't find sppMultipliers.csv in ", dataPath(sim),
+      message(paste0("Can't find sppMultipliers.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
 
       sppMultipliers <- dynamicBiomassFuels[(which(col1=="Fuel") + 1) : (which(col1 == "HardwoodMaximum") - 1),
@@ -242,14 +241,14 @@ calcFuelTypes <- function(sim) {
 
   ## FUEL TYPES TABLE -------------------------------------
   if (!suppliedElsewhere("FuelTypes", sim)) {
-    if (file.exists(file.path(dataPath(sim), "FuelTypes.csv"))) {
+    if (file.exists(file.path(dPath, "FuelTypes.csv"))) {
       sim$FuelTypes <- prepInputs(targetFile = "FuelTypes.csv",
-                                  destinationPath = dataPath(sim),
+                                  destinationPath = dPath,
                                   fun = "utils::read.csv",
                                   header = TRUE)
       sim$FuelTypes <- data.table(sim$FuelTypes)
     } else {
-      message(paste0("Can't find FuelTypes.csv in ", dataPath(sim),
+      message(paste0("Can't find FuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
 
       FuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
@@ -281,15 +280,15 @@ calcFuelTypes <- function(sim) {
 
   ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
   if (!suppliedElsewhere("fTypeEcoreg", sim)) {
-    if (file.exists(file.path(dataPath(sim), "fTypesEcoregions.csv"))) {
+    if (file.exists(file.path(dPath, "fTypesEcoregions.csv"))) {
       sim$fTypeEcoreg <- prepInputs(targetFile = "fTypesEcoregions.csv",
-                                    destinationPath = dataPath(sim),
+                                    destinationPath = dPath,
                                     fun = "utils::read.csv",
                                     header = TRUE)
       sim$fTypeEcoreg <- data.table(sim$fTypeEcoreg)
 
     } else {
-      message(paste0("Can't find fTypesEcoregions.csv in ", dataPath(sim),
+      message(paste0("Can't find fTypesEcoregions.csv in ", dPath,
                      ".\nAssigning NAs to ecoregions in sim$fTypeEcoreg"))
       ## in the LANDIS test examples this feature is turned off and the
       ## ecoregions do not correspond to those in the succession module examples.
@@ -310,13 +309,6 @@ calcFuelTypes <- function(sim) {
 
     ## By default, Abies_las is renamed to Abies_sp
     sim$sppEquiv[KNN == "Abie_Las", LandR := "Abie_sp"]
-
-    ## add default colors for species used in model
-    sim$sppColorVect <- sppColors(sim$sppEquiv, P(sim)$sppEquivCol,
-                                  newVals = "Mixed", palette = "Accent")
-  } else {
-    if (is.null(sim$sppColorVect))
-      stop("If you provide sppEquiv please provide sppColorVect")
   }
 
   return(invisible(sim))
