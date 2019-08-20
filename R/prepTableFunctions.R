@@ -34,6 +34,9 @@ prepFuelTypes <- function(FuelTypes, sppEquiv, sppEquivCol) {
   if (all(is.na(FuelTypes[, speciesCode])))
     stop(paste("Species in sppMultipliers table not found in sppEquiv table"))
 
+  ## exclude lines that have no spp codes
+  FuelTypes <- FuelTypes[!is.na(speciesCode)]
+
   ## convert some columns to numeric
   numCols <- c("minAge", "maxAge", "negSwitch")
   FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
