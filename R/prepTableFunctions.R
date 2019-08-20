@@ -8,7 +8,7 @@ prepSppMultipliers <- function(sppMultipliers, sppEquiv, sppEquivCol) {
   setnames(sppMultipliers, "Species", "speciesCode")
 
   if (all(is.na(sppMultipliers[, speciesCode])))
-    stop(paste("Species in sppMultipliers table not found in sppEquiv table"))
+    stop(paste("None of the species in sppMultipliers were found in sppEquiv table"))
 
   sppMultipliers[, Coefficient := as.numeric(Coefficient)]
 
@@ -32,7 +32,7 @@ prepFuelTypes <- function(FuelTypes, sppEquiv, sppEquivCol) {
   setnames(FuelTypes, "Species", "speciesCode")
 
   if (all(is.na(FuelTypes[, speciesCode])))
-    stop(paste("Species in sppMultipliers table not found in sppEquiv table"))
+    stop(paste("None of the species in FuelTypes were found in sppEquiv table"))
 
   ## exclude lines that have no spp codes
   FuelTypes <- FuelTypes[!is.na(speciesCode)]
