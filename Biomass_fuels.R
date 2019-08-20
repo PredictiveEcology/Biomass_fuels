@@ -158,7 +158,11 @@ calcFuelTypes <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-  dPath <- dataPath(sim)
+  cacheTags <- c(currentModule(sim), "function:.inputObjects")
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  if (getOption("LandR.verbose", TRUE) > 0)
+    message(currentModule(sim), ": using dataPath '", dPath, "'.")
+
   #######################################################
 
   ## SPECIES EQUIVALENCY TABLE ---------------------------
