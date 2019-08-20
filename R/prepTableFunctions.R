@@ -21,6 +21,8 @@ prepSppMultipliers <- function(sppMultipliers, sppEquiv, sppEquivCol) {
   ## remove potential duplicates
   sppMultipliers <- sppMultipliers[!duplicated(sppMultipliers)]
 
+  assertSppMultipliers(sppMultipliers, sppEquiv, sppEquivCol,)
+
   return(sppMultipliers)
 }
 
@@ -36,5 +38,6 @@ prepFuelTypes <- function(FuelTypes, sppEquiv, sppEquivCol) {
   numCols <- c("minAge", "maxAge", "negSwitch")
   FuelTypes[, (numCols) := lapply(.SD, function(x) as.numeric(x)), .SDcols = numCols]
 
+  assertFuelTypes(FuelTypes, sppEquiv, sppEquivCol)
   return(FuelTypes)
 }
