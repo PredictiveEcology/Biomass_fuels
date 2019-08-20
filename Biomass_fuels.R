@@ -35,10 +35,6 @@ defineModule(sim, list(
     expectsInput(objectName = "cohortData", objectClass = "data.table",
                  desc = "age cohort-biomass table hooked to pixel group map by pixelGroupIndex at
                  succession time step", sourceURL = NA),
-    expectsInput(objectName = "sppMultipliers", objectClass = "data.table",
-                 desc = "Table of species biomass coefficient weights.
-                 Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
-                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
     expectsInput(objectName = "FuelTypes", objectClass = "data.table",
                  desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
                  min and max age for each species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
@@ -48,7 +44,11 @@ defineModule(sim, list(
                  Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
     expectsInput(objectName = "sppEquiv", objectClass = "data.table",
                  desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
-                 sourceURL = "")
+                 sourceURL = ""),
+    expectsInput(objectName = "sppMultipliers", objectClass = "data.table",
+                 desc = "Table of species biomass coefficient weights.
+                 Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
+                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")
   ),
   outputObjects = bind_rows(
     createsOutput(objectName = "pixelFuelTypes", objectClass = "data.table",
