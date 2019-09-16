@@ -186,10 +186,13 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   openDT2 <- openDT2[!pixelGroup %in% c(coniferPlantDT$pixelGroup, slashDT2$pixelGroup)]
 
   ## define conifer/hardwood proportions
-  set(coniferPlantDT, NULL, c("coniferDom", "hardwoodDom"), c(0L, 100L))
-  set(slashDT2, NULL, c("coniferDom", "hardwoodDom"), c(0L, 0L))
+  coniferPlantDT[, `:=` (coniferDom = 100L,
+                         hardwoodDom = 0L)]
+  slashDT2[, `:=` (coniferDom = 0L,
+                   hardwoodDom = 0L)]
   slashDT2[, finalFuelType2 := finalFuelType]    ## because we've excluded other fuel types, we can use the one attributed initially
-  set(openDT2, NULL, c("coniferDom", "hardwoodDom"), c(0L, 0L))
+  openDT2[, `:=` (coniferDom = 0L,
+                  hardwoodDom = 0L)]
   openDT2[, finalFuelType2 := finalFuelType]
 
   ## join the plantation/slash and open with unresolved conifer/deciduous fuel types
