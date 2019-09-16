@@ -23,7 +23,7 @@ defineModule(sim, list(
                     desc = "The event time that the first fire disturbance event occurs"),
     defineParameter("fireTimestep", "numeric", NA,
                     desc = "The number of time units between successive fire events in a fire module"),
-    defineParameter(name = "hardwoodMax", class = "numeric", default = 15L,
+    defineParameter(name = "hardwoodMax", class = "integer", default = 15L,
                     desc = "Threshold of percent biomass below which fuel types are considered conifer or mixed.
                     Defaults to 15, as in LANDIS example file"),
     defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
@@ -120,11 +120,13 @@ calcFuelTypes <- function(sim) {
   }
 
   ## CALCULATE SPP VALUES FOR EACH FUEL TYPE IN EACH PIXEL ------------------------------
-  ## calculate total biomass per pixelGroup, ecoregion and fuel type
+  ## calculate total biomass per pixelGroup and fuel type
+  ## (not necessary to group by ecoregion, since only one exists per pixelGroup)
   ## only species contributing to a given fuel type and with appropriate age are considered
   ## species biomass is weighted by the coeff and becomes
   ## negative if the species has a negative contribution (negSwitch) to that fuel type
-  cols <- c("pixelGroup", "ecoregionGroup", "FuelType")
+
+  cols <- c("pixelGroup", "FuelType")
   pixelFuelTypes <- pixelFuelTypes[age >= minAge & age <= maxAge,
                                    forTypValue := sum(B*Coefficient*negSwitch),
                                    by = cols]
@@ -134,25 +136,13 @@ calcFuelTypes <- function(sim) {
   ## ASSESS DOMINANT FUEL TYPE ----------------------------------------
   ## get max spp value (total biomass) in each pixelGroup and
   ## attribute corresponding fuel type in function of conifer/deciduous biomass
-  cols <- c("pixelGroup", "ecoregionGroup")
+  ## (not necessary to group by ecoregion, since only one exists per pixelGroup)
   pixelFuelTypes[, maxValue := max(forTypValue, na.rm = TRUE),
-                 by = cols]
+                 by = "pixelGroup"]
+  pixelFuelTypes <- calcFinalFuels(pixelFuelTypes = pixelFuelTypes,
+                            hardwoodMax = P(sim)$hardwoodMax)
 
-  pixelFuelTypes[, finalBaseFuel := as.character()]
-  pixelFuelTypes[, c("sumConifer", "sumDecid",
-                     "coniferDom", "hardwoodDom",
-                     "finalFuelType") := as.integer()]
-  pixelFuelTypes[, c("sumConifer", "sumDecid",
-                     "coniferDom", "hardwoodDom",
-                     "finalBaseFuel", "finalFuelType") := calcFinalFuels(BaseFuel, FuelType,
-                                                                         forTypValue, maxValue,
-                                                                         P(sim)$hardwoodMax),
-                 by = cols]
-  ## remove unnecessary columns and export to sim
-  pixelFuelTypes <- cbind(pixelFuelTypes[, .(pixelGroup, ecoregionGroup)],
-                          pixelFuelTypes[, finalBaseFuel:finalFuelType])
-  pixelFuelTypes <- unique(pixelFuelTypes)
-  sim$pixelFuelTypes <- copy(pixelFuelTypes)
+  sim$pixelFuelTypes <- pixelFuelTypes
 
   return(invisible(sim))
 }
