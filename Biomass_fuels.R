@@ -95,19 +95,39 @@ calcFuelTypes <- function(sim) {
   tempFT <- na.omit(copy(sim$FuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
 
   ## merge the two tables
-  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE, nomatch = 0]
-  pixelFuelTypes <- pixelFuelTypes[order(pixelGroup)]
+  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE,
+                                   nomatch = NA]
+  if (isTRUE(getOption("LandR.assertions"))) {
+    cols <- c("FuelTypeFBP", "FuelType", "BaseFuel", "minAge",
+              "maxAge", "speciesCode", "negSwitch")
+    if (any(is.na(pixelFuelTypes[, ..cols]))) {
+      stop("speciesCodes do not match between cohortData and FuelTypes table.")
+    }
+  }
 
   ## add sppMultipliers
   pixelFuelTypes <- pixelFuelTypes[sim$sppMultipliers[,.(speciesCode, Coefficient)],
-                                   on = .(speciesCode), nomatch = 0]
-  pixelFuelTypes <- pixelFuelTypes[order(pixelGroup)]
+                                   on = .(speciesCode), nomatch = NA]
+  if (isTRUE(getOption("LandR.assertions"))) {
+    cols <- c("Coefficient")
+    if (any(is.na(pixelFuelTypes[, ..cols]))) {
+      stop("speciesCodes do not match between cohortData and sppMultipliers table.")
+    }
+  }
 
-  ## add fuel type ecoregions
-  pixelFuelTypes <- pixelFuelTypes[sim$fTypeEcoreg, on = .(FuelType), nomatch = 0]
+
+  ## add fuel type ecoregions and remove fuel types in the wrong regions.
+  origPGs <- unique(pixelFuelTypes$pixelGroup)
+  pixelFuelTypes <- pixelFuelTypes[sim$fTypeEcoreg, on = .(FuelType), nomatch = NA]
   pixelFuelTypes <- pixelFuelTypes[, ftEcoregion := as.numeric(Ecoregions)]
   pixelFuelTypes <- pixelFuelTypes[, Ecoregions := NULL]
 
+  if (isTRUE(getOption("LandR.assertions"))) {
+    cols <- c("ftEcoregion")
+    if (any(is.na(pixelFuelTypes[, ..cols]))) {
+      warning("Some fuel types have no ecoregion in the fTypeEcoreg table (or are not listed there)")
+    }
+  }
 
   ## CHECK FUEL TYPES AND ECOREGIONS ------------------------------
   ## if fuel types are ecoregion-specific, remove fuel types
