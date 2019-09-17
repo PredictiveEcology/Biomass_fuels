@@ -20,7 +20,7 @@
 
 calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   pixelFuelTypes <- pixelFuelTypes[, .(BaseFuel, FuelType, forTypValue, maxValue,
-                               pixelGroup)]
+                                       pixelGroup)]
   pixelFuelTypes <- pixelFuelTypes[!duplicated(pixelFuelTypes)]
 
   ## ignore "mixed" fuel type
@@ -84,7 +84,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   if (is.null(coniferDT[["coniferPlantMaxValue"]]))
     coniferDT[, coniferMaxValue := integer(0)]
 
-    ## determine the dominant deciduous fuel type
+  ## determine the dominant deciduous fuel type
   deciduosDT <- pixelFuelTypes[grepl("Deciduous", BaseFuel)]
   if (NROW(deciduosDT)) {
     deciduosDT[, decidMaxValue := max(forTypValue, na.rm = TRUE),
@@ -136,8 +136,8 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   tempDT <- rbind(coniferDT, deciduosDT, slashDT, openDT, fill = TRUE)
   ## suppressWarning about coersion
   tempDT <- suppressWarnings(melt(tempDT, id.vars = c("pixelGroup", "sumDecid", "sumConifer",
-                                                        "BaseFuel", "FuelType", "forTypValue", "maxValue", "finalFuelType"),
-                                   variable.factor = FALSE))
+                                                      "BaseFuel", "FuelType", "forTypValue", "maxValue", "finalFuelType"),
+                                  variable.factor = FALSE))
   tempDT <- na.omit(tempDT)
 
   ## RESOLVE COMPETING NON-CONIFEROUS/DECIDUOUS FUEL TYPES ----------------
@@ -150,11 +150,11 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   ## duplicated pixel groups have several "competing" fuel types
   dupsPG <- unique(tempDT$pixelGroup[duplicated(tempDT$pixelGroup)])
 
- if (length(dupsPG)) {
+  if (length(dupsPG)) {
     dupsDT <- tempDT[pixelGroup %in% dupsPG]
     dupsDT[, c("finalFuelType2", "finalBaseFuel") := .findFinalFuelType(BaseFuel,
-                                                                       finalFuelType,
-                                                                       maxValue, value),
+                                                                        finalFuelType,
+                                                                        maxValue, value),
            by = "pixelGroup"]
 
     ## remove pixelGroups for which we could'nt find the final fuel type yet
@@ -186,13 +186,13 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   openDT2 <- openDT2[!pixelGroup %in% c(coniferPlantDT$pixelGroup, slashDT2$pixelGroup)]
 
   ## define conifer/hardwood proportions
-  coniferPlantDT[, `:=` (coniferDom = 100L,
-                         hardwoodDom = 0L)]
-  slashDT2[, `:=` (coniferDom = 0L,
-                   hardwoodDom = 0L)]
-  slashDT2[, finalFuelType2 := finalFuelType]    ## because we've excluded other fuel types, we can use the one attributed initially
-  openDT2[, `:=` (coniferDom = 0L,
+  coniferPlantDT[, `:=`(coniferDom = 100L,
+                        hardwoodDom = 0L)]
+  slashDT2[, `:=`(coniferDom = 0L,
                   hardwoodDom = 0L)]
+  slashDT2[, finalFuelType2 := finalFuelType]    ## because we've excluded other fuel types, we can use the one attributed initially
+  openDT2[, `:=`(coniferDom = 0L,
+                 hardwoodDom = 0L)]
   openDT2[, finalFuelType2 := finalFuelType]
 
   ## join the plantation/slash and open with unresolved conifer/deciduous fuel types
@@ -204,40 +204,40 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   ## resolve dominant fuel type and ajust dominance accordingly
   ## calculate the proportion of conifer/deciduous cover
   tempDT[sumConifer > 0 | sumDecid > 0,
-          `:=` (coniferDom = as.integer(ceiling(sumConifer/(sumConifer + sumDecid) * 100)),
-                hardwoodDom = as.integer(ceiling(sumDecid/(sumConifer + sumDecid) * 100)))]
+         `:=` (coniferDom = as.integer(ceiling(sumConifer/(sumConifer + sumDecid) * 100)),
+               hardwoodDom = as.integer(ceiling(sumDecid/(sumConifer + sumDecid) * 100)))]
 
   ## if the proportion of deciduous is lower than the threshold,
   ## the stand is considered pure conifer and gets the corresponding fuel type
   tempDT[hardwoodDom < hardwoodMax, `:=` (coniferDom = 100L,
-                                           hardwoodDom = 0L)]
+                                          hardwoodDom = 0L)]
   tempDT[hardwoodDom < hardwoodMax,
-          finalFuelType2 := finalFuelType[grepl("conifer", variable)],
-          by = "pixelGroup"]
+         finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+         by = "pixelGroup"]
   tempDT[hardwoodDom < hardwoodMax,
-          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
-          by = "pixelGroup"]
+         finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
+         by = "pixelGroup"]
 
   ## if the proportion of conifers is lower than the threshold,
   ## the stand is considered pure deciduos and gets the corresponding fuel type
   tempDT[coniferDom < hardwoodMax, `:=` (coniferDom = 0L,
-                                           hardwoodDom = 100L)]
+                                         hardwoodDom = 100L)]
   tempDT[coniferDom < hardwoodMax,
-          finalFuelType2 := finalFuelType[grepl("decid", variable)],
-          by = "pixelGroup"]
+         finalFuelType2 := finalFuelType[grepl("decid", variable)],
+         by = "pixelGroup"]
   tempDT[coniferDom < hardwoodMax,
-          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
-          by = "pixelGroup"]
+         finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
+         by = "pixelGroup"]
 
   ## if both the proportion of conifers and diciduos are higher than the threshold,
   ## the proportions are left untouched (like a mixed stand)
   ## and the fuel type is considered to be coniferous
   tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
-          finalFuelType2 := finalFuelType[grepl("conifer", variable)],
-          by = "pixelGroup"]
+         finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+         by = "pixelGroup"]
   tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
-          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
-          by = "pixelGroup"]
+         finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
+         by = "pixelGroup"]
 
   ## overwrite initial fuel types with revised ones
   tempDT[, finalFuelType := finalFuelType2]
