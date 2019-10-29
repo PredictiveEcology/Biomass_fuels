@@ -193,7 +193,10 @@ calcFuelTypes <- function(sim) {
   pixelFuelTypes <- calcFinalFuels(pixelFuelTypes = pixelFuelTypes,
                             hardwoodMax = P(sim)$hardwoodMax)
 
-  sim$pixelFuelTypes <- pixelFuelTypes
+  ## rasterize forests fuel types table
+  fuelTypesMaps <- rasterizeReduced(pixelGroupFuelTypes, sim$pixelGroupMap,
+                                    newRasterCols = c("finalFuelType" , "coniferDom"),
+                                    mapcode = "pixelGroup")
 
   ## ADD FUEL TYPES IN NON-FORESTED PIXELS ---------------------------
   if (P(sim)$nonForestFire) {
@@ -245,6 +248,9 @@ calcFuelTypes <- function(sim) {
     fuelTypesMaps$curing <- fuelTypesMaps$finalFuelType
     fuelTypesMaps$curing[] <- NA
   }
+
+  ## export to sim
+  sim$fuelTypesMaps <- fuelTypesMaps
 
   return(invisible(sim))
 }
