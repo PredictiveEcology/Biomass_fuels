@@ -53,8 +53,8 @@ defineModule(sim, list(
                  Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")
   ),
   outputObjects = bind_rows(
-    createsOutput(objectName = "pixelFuelTypes", objectClass = "data.table",
-                  desc = "Fuel types per pixel group, calculated from cohort biomasses")
+    createsOutput(objectName = "fuelTypesMaps", objectClass = "list",
+                  desc = "List of RasterLayers of fuel types and coniferDominance per pixel."),
   )
 ))
 
