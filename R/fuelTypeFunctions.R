@@ -6,11 +6,11 @@
 #' In a mixed stand case, the proportion of conifers and deciduous biomass is used later necessary to \
 #' for Fire Behaviour Predition system calcualtions
 #'
-#' @param pixelFuelTypes a \code{data.table} with fuel types per pixel group, calculated from cohort biomasses
+#' @param pixelGroupFuelTypes a \code{data.table} with fuel types per pixel group, calculated from cohort biomasses
 #' @param hardwoodMax an \code{integer} that defined the threshold of percent biomass below which fuel
 #'    types are considered conifer or mixed. Defaults to 15, as in LANDIS example file
 #'
-#' @return an updated \code{pixelFuelTypes} \code{data.table} with the added columns:
+#' @return an updated \code{pixelGroupFuelTypes} \code{data.table} with the added columns:
 #'    finalFuelType - the final fuel type (\code{integer}),
 #'    finalBaseFuel - th final base fuel (\code{character}),
 #'    coniferDom and hardwoodDom - the proportion of conifer and deciduous biomass.
@@ -18,42 +18,42 @@
 #' @export
 #' @importFrom data.table set setkey rbind
 
-calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
-  pixelFuelTypes <- pixelFuelTypes[, .(BaseFuel, FuelType, forTypValue, maxValue,
+calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[, .(BaseFuel, FuelType, forTypValue, maxValue,
                                        pixelGroup)]
-  pixelFuelTypes <- pixelFuelTypes[!duplicated(pixelFuelTypes)]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[!duplicated(pixelGroupFuelTypes)]
 
   ## ignore "mixed" fuel type
-  pixelFuelTypes <- pixelFuelTypes[BaseFuel != "Mixed"]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[BaseFuel != "Mixed"]
 
   ## CALCULATE CONIFEROUS/DECIDUOUS DOMINANCE ----
   ## sum conifer fuel types per pixelGroup and join
-  coniferDT <- pixelFuelTypes[grepl("Conifer", BaseFuel)]
+  coniferDT <- pixelGroupFuelTypes[grepl("Conifer", BaseFuel)]
   coniferDT[, sumConifer := sum(forTypValue, na.rm = TRUE),
             by = "pixelGroup"]
   setkey(coniferDT, pixelGroup)
-  setkey(pixelFuelTypes, pixelGroup)
-  pixelFuelTypes <- coniferDT[, .(pixelGroup, sumConifer)][pixelFuelTypes, nomatch = NA]
+  setkey(pixelGroupFuelTypes, pixelGroup)
+  pixelGroupFuelTypes <- coniferDT[, .(pixelGroup, sumConifer)][pixelGroupFuelTypes, nomatch = NA]
   rm(coniferDT)
 
   ## sum deciduous fuel types per pixelGroup and join
-  deciduosDT <- pixelFuelTypes[grepl("Deciduous", BaseFuel)]
+  deciduosDT <- pixelGroupFuelTypes[grepl("Deciduous", BaseFuel)]
   deciduosDT[, sumDecid := sum(forTypValue, na.rm = TRUE),
              by = "pixelGroup"]
   setkey(deciduosDT, pixelGroup)
-  setkey(pixelFuelTypes, pixelGroup)
-  pixelFuelTypes <- deciduosDT[, .(pixelGroup, sumDecid)][pixelFuelTypes, nomatch = NA]
+  setkey(pixelGroupFuelTypes, pixelGroup)
+  pixelGroupFuelTypes <- deciduosDT[, .(pixelGroup, sumDecid)][pixelGroupFuelTypes, nomatch = NA]
   rm(deciduosDT)
 
-  pixelFuelTypes[is.na(sumConifer), sumConifer := 0]
-  pixelFuelTypes[is.na(sumDecid), sumDecid := 0]
+  pixelGroupFuelTypes[is.na(sumConifer), sumConifer := 0]
+  pixelGroupFuelTypes[is.na(sumDecid), sumDecid := 0]
 
   ## DETERMINE DOMINANT FUEL TYPES PER BASE FUEL
   ## NOTE: if several fuel types have the maximum biomass
   ## for a given base fuel, they'll win based on table order
 
   ## determine the dominant conifer fuel type
-  coniferDT <- pixelFuelTypes[grepl("Conifer", BaseFuel)]
+  coniferDT <- pixelGroupFuelTypes[grepl("Conifer", BaseFuel)]
   coniferPlantDT <- coniferDT[grepl("Plantation", coniferDT$BaseFuel)]
   coniferDT <- coniferDT[!grepl("Plantation", coniferDT$BaseFuel)]
 
@@ -85,7 +85,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
     coniferDT[, coniferMaxValue := integer(0)]
 
   ## determine the dominant deciduous fuel type
-  deciduosDT <- pixelFuelTypes[grepl("Deciduous", BaseFuel)]
+  deciduosDT <- pixelGroupFuelTypes[grepl("Deciduous", BaseFuel)]
   if (NROW(deciduosDT)) {
     deciduosDT[, decidMaxValue := max(forTypValue, na.rm = TRUE),
                by = "pixelGroup"]
@@ -97,7 +97,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
     deciduosDT[, decidMaxValue := integer(0)]
 
   ## determine the mixed  fuel type -- not used in LANDIS
-  # mixedDT <- pixelFuelTypes[grepl("Mixed", BaseFuel)]
+  # mixedDT <- pixelGroupFuelTypes[grepl("Mixed", BaseFuel)]
   # if (NROW(mixedDT)) {
   #   mixedDT[, mixedMaxValue := max(forTypValue, na.rm = TRUE),
   #           by = "pixelGroup"]
@@ -109,7 +109,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   #   mixedDT[, mixedMaxValue := integer(0)]
 
   ## determine the dominant slash fuel type
-  slashDT <- pixelFuelTypes[grepl("Slash", BaseFuel)]
+  slashDT <- pixelGroupFuelTypes[grepl("Slash", BaseFuel)]
   if (NROW(slashDT)) {
     slashDT[, slashMaxValue := max(forTypValue, na.rm = TRUE),
             by = "pixelGroup"]
@@ -122,7 +122,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
 
 
   ## determine the dominant open fuel type
-  openDT <- pixelFuelTypes[grepl("Open", BaseFuel)]
+  openDT <- pixelGroupFuelTypes[grepl("Open", BaseFuel)]
   if (NROW(openDT)) {
     openDT[, openMaxValue := max(forTypValue, na.rm = TRUE),
            by = "pixelGroup"]
@@ -248,8 +248,8 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
             "finalBaseFuel", "finalFuelType")
   tempDT <- unique(tempDT[, ..cols])
 
-  pixelFuelTypes <- tempDT
-  return(pixelFuelTypes)
+  pixelGroupFuelTypes <- tempDT
+  return(pixelGroupFuelTypes)
 }
 
 #' Resolve conflicting fuel types

@@ -126,42 +126,42 @@ fuelsInit <- function(sim) {
 
 calcFuelTypes <- function(sim) {
   ## PIXEL FUEL TYPES TABLE ------------------------
-  ## create pixelFuelTypes table from cohorData
+  ## create pixelGroupFuelTypes table from cohorData
   ## subset cohort data and non-na fuel types
-  pixelFuelTypes <- sim$cohortData[, .(speciesCode, pixelGroup, ecoregionGroup, age, B)]
+  pixelGroupFuelTypes <- sim$cohortData[, .(speciesCode, pixelGroup, ecoregionGroup, age, B)]
   tempFT <- na.omit(copy(sim$ForestFuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
 
   ## merge the two tables
-  pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE,
-                                   nomatch = NA]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE,
+                                             nomatch = NA]
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("FuelTypeFBP", "FuelType", "BaseFuel", "minAge",
               "maxAge", "speciesCode", "negSwitch")
-    if (any(is.na(pixelFuelTypes[, ..cols]))) {
-      stop("speciesCodes do not match between cohortData and FuelTypes table.")
+    if (any(is.na(pixelGroupFuelTypes[, ..cols]))) {
+      stop("speciesCodes do not match between cohortData and ForestFuelTypes table.")
     }
   }
 
   ## add sppMultipliers
-  pixelFuelTypes <- pixelFuelTypes[sim$sppMultipliers[,.(speciesCode, Coefficient)],
-                                   on = .(speciesCode), nomatch = NA]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[sim$sppMultipliers[,.(speciesCode, Coefficient)],
+                                             on = .(speciesCode), nomatch = NA]
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("Coefficient")
-    if (any(is.na(pixelFuelTypes[, ..cols]))) {
+    if (any(is.na(pixelGroupFuelTypes[, ..cols]))) {
       stop("speciesCodes do not match between cohortData and sppMultipliers table.")
     }
   }
 
 
   ## add fuel type ecoregions and remove fuel types in the wrong regions.
-  origPGs <- unique(pixelFuelTypes$pixelGroup)
-  pixelFuelTypes <- pixelFuelTypes[sim$fTypeEcoreg, on = .(FuelType), nomatch = NA]
-  pixelFuelTypes <- pixelFuelTypes[, ftEcoregion := as.numeric(Ecoregions)]
-  pixelFuelTypes <- pixelFuelTypes[, Ecoregions := NULL]
+  origPGs <- unique(pixelGroupFuelTypes$pixelGroup)
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[sim$fTypeEcoreg, on = .(FuelType), nomatch = NA]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[, ftEcoregion := as.numeric(Ecoregions)]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[, Ecoregions := NULL]
 
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("ftEcoregion")
-    if (any(is.na(pixelFuelTypes[, ..cols]))) {
+    if (any(is.na(pixelGroupFuelTypes[, ..cols]))) {
       warning("Some fuel types have no ecoregion in the fTypeEcoreg table (or are not listed there)")
     }
   }
@@ -169,11 +169,11 @@ calcFuelTypes <- function(sim) {
   ## CHECK FUEL TYPES AND ECOREGIONS ------------------------------
   ## if fuel types are ecoregion-specific, remove fuel types
   ## that are in wrong ecoregion
-  if (any(!is.na(pixelFuelTypes$ftEcoregion))) {
-    subsetDT <- pixelFuelTypes[!is.na(ftEcoregion)]
+  if (any(!is.na(pixelGroupFuelTypes$ftEcoregion))) {
+    subsetDT <- pixelGroupFuelTypes[!is.na(ftEcoregion)]
     subsetDT <- subsetDT[ftEcoregion == ecoregionGroup]
-    subsetDT <- rbind(pixelFuelTypes[is.na(ftEcoregion)], subsetDT)
-    pixelFuelTypes <- subsetDT
+    subsetDT <- rbind(pixelGroupFuelTypes[is.na(ftEcoregion)], subsetDT)
+    pixelGroupFuelTypes <- subsetDT
   }
 
   ## CALCULATE SPP VALUES FOR EACH FUEL TYPE IN EACH PIXEL ------------------------------
@@ -184,20 +184,20 @@ calcFuelTypes <- function(sim) {
   ## negative if the species has a negative contribution (negSwitch) to that fuel type
 
   cols <- c("pixelGroup", "FuelType")
-  pixelFuelTypes <- pixelFuelTypes[age >= minAge & age <= maxAge,
-                                   forTypValue := sum(B*Coefficient*negSwitch),
-                                   by = cols]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[age >= minAge & age <= maxAge,
+                                             forTypValue := sum(B*Coefficient*negSwitch),
+                                             by = cols]
   ## remove lines that have no biomass for a fuel
-  pixelFuelTypes <- pixelFuelTypes[!is.na(forTypValue)]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[!is.na(forTypValue)]
 
   ## ASSESS DOMINANT FUEL TYPE ----------------------------------------
   ## get max spp value (total biomass) in each pixelGroup and
   ## attribute corresponding fuel type in function of conifer/deciduous biomass
   ## (not necessary to group by ecoregion, since only one exists per pixelGroup)
-  pixelFuelTypes[, maxValue := max(forTypValue, na.rm = TRUE),
-                 by = "pixelGroup"]
-  pixelFuelTypes <- calcFinalFuels(pixelFuelTypes = pixelFuelTypes,
-                            hardwoodMax = P(sim)$hardwoodMax)
+  pixelGroupFuelTypes[, maxValue := max(forTypValue, na.rm = TRUE),
+                      by = "pixelGroup"]
+  pixelGroupFuelTypes <- calcFinalFuels(pixelGroupFuelTypes = pixelGroupFuelTypes,
+                                        hardwoodMax = P(sim)$hardwoodMax)
 
   ## rasterize forests fuel types table
   fuelTypesMaps <- rasterizeReduced(pixelGroupFuelTypes, sim$pixelGroupMap,
