@@ -35,10 +35,12 @@ defineModule(sim, list(
     expectsInput(objectName = "cohortData", objectClass = "data.table",
                  desc = "age cohort-biomass table hooked to pixel group map by pixelGroupIndex at
                  succession time step", sourceURL = NA),
-    expectsInput(objectName = "FuelTypes", objectClass = "data.table",
-                 desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
-                 min and max age for each species (see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
-                 Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
+    expectsInput(objectName = "ForestFuelTypes", objectClass = "data.table",
+                 desc = paste("Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code),",
+                              "their - or + contribution ('negSwitch'), min and max age for each species (see LANDIS-II",
+                              "Dynamic Fire System Extension (v2.1) User Guide). Fuel types come from CF Fire Behaviour",
+                              "Prediction System (2nd Ed.). Default values adapted from",
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")),
     expectsInput(objectName = "fTypeEcoreg", objectClass = "data.table",
                  desc = "Table of Fuel Types per Ecoregion (optional, see LANDIS-II Dynamic Fire System Extension (v2.1) User Guide).
                  Default values adapted from https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
@@ -92,7 +94,7 @@ calcFuelTypes <- function(sim) {
   ## create pixelFuelTypes table from cohorData
   ## subset cohort data and non-na fuel types
   pixelFuelTypes <- sim$cohortData[, .(speciesCode, pixelGroup, ecoregionGroup, age, B)]
-  tempFT <- na.omit(copy(sim$FuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
+  tempFT <- na.omit(copy(sim$ForestFuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
 
   ## merge the two tables
   pixelFuelTypes <- pixelFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE,
@@ -190,10 +192,10 @@ calcFuelTypes <- function(sim) {
   ## Get LANDIS example parameters -----------------------
   ## to use if others haven't been supplied in <module>/inputs
   if (any(!suppliedElsewhere("sppMultipliers", sim),
-          !suppliedElsewhere("FuelTypes", sim),
+          !suppliedElsewhere("ForestFuelTypes", sim),
           !suppliedElsewhere("fTypeEcoreg", sim)) &
       any(!file.exists(file.path(dPath, "sppMultipliers.csv")),
-          file.exists(file.path(dPath, "FuelTypes.csv")))) {
+          file.exists(file.path(dPath, "ForestFuelTypes.csv")))) {
     maxcol <- 21 #max(count.fields(file.path(getPaths()$dataPath, "dynamic-biomass-fuels.txt"), sep = ""))
     dynamicBiomassFuels <- Cache(prepInputs,targetFile = "dynamic-biomass-fuels.txt",
                                  url = paste0("https://raw.githubusercontent.com/CeresBarros/",
@@ -250,44 +252,44 @@ calcFuelTypes <- function(sim) {
   }
 
   ## FUEL TYPES TABLE -------------------------------------
-  if (!suppliedElsewhere("FuelTypes", sim)) {
-    if (file.exists(file.path(dPath, "FuelTypes.csv"))) {
-      FuelTypes <- prepInputs(targetFile = "FuelTypes.csv",
+  if (!suppliedElsewhere("ForestFuelTypes", sim)) {
+    if (file.exists(file.path(dPath, "ForestFuelTypes.csv"))) {
+      ForestFuelTypes <- prepInputs(targetFile = "ForestFuelTypes.csv",
                               destinationPath = dPath,
                               fun = "utils::read.csv",
                               header = TRUE)
-      FuelTypes <- data.table(FuelTypes)
+      ForestFuelTypes <- data.table(ForestFuelTypes)
     } else {
-      message(paste0("Can't find FuelTypes.csv in ", dPath,
+      message(paste0("Can't find ForestFuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
 
-      FuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
+      ForestFuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
                                        col1:col14]
       ## rename columns
-      FuelTypes[1, `:=`(col3 = "minAge",
+      ForestFuelTypes[1, `:=`(col3 = "minAge",
                         col4 = "NA",
                         col5 = "maxAge",
                         col6 = "Species")]
-      FuelTypes[, col4 := NULL]
-      names(FuelTypes) <- c(as.character(FuelTypes[1, 1:5, with = FALSE]), paste0("Species", 2:9))
-      FuelTypes <- FuelTypes[-1]
+      ForestFuelTypes[, col4 := NULL]
+      names(ForestFuelTypes) <- c(as.character(ForestFuelTypes[1, 1:5, with = FALSE]), paste0("Species", 2:9))
+      ForestFuelTypes <- ForestFuelTypes[-1]
 
       ## melt table to get all species in one column
-      FuelTypes <- melt(FuelTypes, id.vars = 1:4, variable.name = "Species")
-      FuelTypes <-   FuelTypes[value != ""]
-      setnames(FuelTypes, "value", "Species")
+      ForestFuelTypes <- melt(ForestFuelTypes, id.vars = 1:4, variable.name = "Species")
+      ForestFuelTypes <-   ForestFuelTypes[value != ""]
+      setnames(ForestFuelTypes, "value", "Species")
 
       ## create a column with negative switch
       ## species with a negative switch negatively contribute to a fuel type
-      FuelTypes[grepl("-", Species), negSwitch := -1L]
-      FuelTypes[is.na(negSwitch), negSwitch := 1]
-      FuelTypes[, Species := sub("-", "", Species)]
+      ForestFuelTypes[grepl("-", Species), negSwitch := -1L]
+      ForestFuelTypes[is.na(negSwitch), negSwitch := 1]
+      ForestFuelTypes[, Species := sub("-", "", Species)]
     }
-    FuelTypes <- prepFuelTypes(FuelTypes,
+    ForestFuelTypes <- prepFuelTypes(ForestFuelTypes,
                                sppEquiv = sim$sppEquiv,
                                sppEquivCol = P(sim)$sppEquivCol)
 
-    sim$FuelTypes <- FuelTypes
+    sim$ForestFuelTypes <- ForestFuelTypes
   }
 
   ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
@@ -305,11 +307,11 @@ calcFuelTypes <- function(sim) {
       ## in the LANDIS test examples this feature is turned off and the
       ## ecoregions do not correspond to those in the succession module examples.
       ## assigning NAs for ecoregions in all fuel types to simualte this behaviour
-      fTypeEcoreg <- data.table(FuelType = sort(unique(sim$FuelTypes$FuelType)), Ecoregions = NA)
+      fTypeEcoreg <- data.table(FuelType = sort(unique(sim$ForestFuelTypes$FuelType)), Ecoregions = NA)
     }
 
     ## assign NAs in fuel types with no ecoregion
-    fTypeEcoreg <- fTypeEcoreg[sim$FuelTypes[, .(FuelType)], on = "FuelType", nomatch = NA]
+    fTypeEcoreg <- fTypeEcoreg[sim$ForestFuelTypes[, .(FuelType)], on = "FuelType", nomatch = NA]
 
     fTypeEcoreg <- unique(fTypeEcoreg)
     sim$fTypeEcoreg <- fTypeEcoreg
