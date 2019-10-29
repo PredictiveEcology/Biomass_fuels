@@ -114,7 +114,10 @@ doEvent.Biomass_fuels = function(sim, eventTime, eventType) {
 
 ### template initialization
 fuelsInit <- function(sim) {
-  ## nothing to initialize
+  ## checks
+  if (start(sim) == P(sim)$fireInitialTime)
+    warning(red("start(sim) and P(sim)$fireInitialTime are the same.\nThis may create bad scheduling with init events"))
+
   return(invisible(sim))
 }
 
