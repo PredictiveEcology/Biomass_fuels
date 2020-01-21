@@ -349,21 +349,21 @@ calcFuelTypes <- function(sim) {
   if (!suppliedElsewhere("ForestFuelTypes", sim)) {
     if (file.exists(file.path(dPath, "ForestFuelTypes.csv"))) {
       ForestFuelTypes <- prepInputs(targetFile = "ForestFuelTypes.csv",
-                              destinationPath = dPath,
-                              fun = "utils::read.csv",
-                              header = TRUE)
+                                    destinationPath = dPath,
+                                    fun = "utils::read.csv",
+                                    header = TRUE)
       ForestFuelTypes <- data.table(ForestFuelTypes)
     } else {
       message(paste0("Can't find ForestFuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
 
       ForestFuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
-                                       col1:col14]
+                                             col1:col14]
       ## rename columns
       ForestFuelTypes[1, `:=`(col3 = "minAge",
-                        col4 = "NA",
-                        col5 = "maxAge",
-                        col6 = "Species")]
+                              col4 = "NA",
+                              col5 = "maxAge",
+                              col6 = "Species")]
       ForestFuelTypes[, col4 := NULL]
       names(ForestFuelTypes) <- c(as.character(ForestFuelTypes[1, 1:5, with = FALSE]), paste0("Species", 2:9))
       ForestFuelTypes <- ForestFuelTypes[-1]
@@ -380,8 +380,8 @@ calcFuelTypes <- function(sim) {
       ForestFuelTypes[, Species := sub("-", "", Species)]
     }
     ForestFuelTypes <- prepFuelTypes(ForestFuelTypes,
-                               sppEquiv = sim$sppEquiv,
-                               sppEquivCol = P(sim)$sppEquivCol)
+                                     sppEquiv = sim$sppEquiv,
+                                     sppEquivCol = P(sim)$sppEquivCol)
 
     sim$ForestFuelTypes <- ForestFuelTypes
   }
