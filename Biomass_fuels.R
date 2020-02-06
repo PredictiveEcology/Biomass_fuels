@@ -532,6 +532,20 @@ calcFuelTypes <- function(sim) {
         sim$rasterToMatch[!is.na(RTMvals)] <- 1
       }
 
+      if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
+        warning(paste0("studyArea and rasterToMatch projections differ.\n",
+                       "studyArea will be projected to match rasterToMatch"))
+        sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
+        sim$studyArea <- fixErrors(sim$studyArea)
+      }
+
+      if (!identical(crs(sim$studyAreaLarge), crs(sim$rasterToMatchLarge))) {
+        warning(paste0("studyAreaLarge and rasterToMatchLarge projections differ.\n",
+                       "studyAreaLarge will be projected to match rasterToMatchLarge"))
+        sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$rasterToMatchLarge))
+        sim$studyAreaLarge <- fixErrors(sim$studyAreaLarge)
+      }
+
       sim$rstLCC <- Cache(prepInputs,
                           targetFile = lcc2005Filename,
                           archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
