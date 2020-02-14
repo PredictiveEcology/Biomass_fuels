@@ -157,7 +157,6 @@ calcFuelTypes <- function(sim) {
 
 
   ## add fuel type ecoregions and remove fuel types in the wrong regions.
-  origPGs <- unique(pixelGroupFuelTypes$pixelGroup)
   pixelGroupFuelTypes <- pixelGroupFuelTypes[sim$fTypeEcoreg, on = .(FuelType), nomatch = NA]
   pixelGroupFuelTypes <- pixelGroupFuelTypes[, ftEcoregion := as.numeric(Ecoregions)]
   pixelGroupFuelTypes <- pixelGroupFuelTypes[, Ecoregions := NULL]
