@@ -134,8 +134,8 @@ calcFuelTypes <- function(sim) {
   tempFT <- na.omit(copy(sim$ForestFuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
 
   ## merge the two tables
-  pixelGroupFuelTypes <- pixelGroupFuelTypes[tempFT, on = .(speciesCode), allow.cartesian = TRUE,
-                                             nomatch = NA]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[tempFT, on = .(speciesCode),
+                                             allow.cartesian = TRUE, nomatch = NA]
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("FuelTypeFBP", "FuelType", "BaseFuel", "minAge",
               "maxAge", "speciesCode", "negSwitch")
@@ -145,6 +145,7 @@ calcFuelTypes <- function(sim) {
   }
 
   ## add sppMultipliers
+  browser()
   pixelGroupFuelTypes <- pixelGroupFuelTypes[sim$sppMultipliers[,.(speciesCode, Coefficient)],
                                              on = .(speciesCode), nomatch = NA]
   if (isTRUE(getOption("LandR.assertions"))) {
@@ -164,7 +165,7 @@ calcFuelTypes <- function(sim) {
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("ftEcoregion")
     if (any(is.na(pixelGroupFuelTypes[, ..cols]))) {
-      warning("Some fuel types have no ecoregion in the fTypeEcoreg table (or are not listed there)")
+      message("Some fuel types have no ecoregion in the fTypeEcoreg table (or are not listed there)")
     }
   }
 
@@ -184,7 +185,6 @@ calcFuelTypes <- function(sim) {
   ## only species contributing to a given fuel type and with appropriate age are considered
   ## species biomass is weighted by the coeff and becomes
   ## negative if the species has a negative contribution (negSwitch) to that fuel type
-
   cols <- c("pixelGroup", "FuelType")
   pixelGroupFuelTypes <- pixelGroupFuelTypes[age >= minAge & age <= maxAge,
                                              forTypValue := sum(B*Coefficient*negSwitch),
