@@ -143,7 +143,7 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
   ## RESOLVE COMPETING NON-CONIFEROUS/DECIDUOUS FUEL TYPES ----------------
   ## get the fuel type with the maximum biomass - this will only work for
   ## plantations, slash and open, since maxValue for conifer/deciduous is
-  ## summed and doens't correspond directly to the values of each of these types
+  ## summed and doesn't correspond directly to the values of each of these types
   ## when both exist.
   ## Ties are resolved later
 
