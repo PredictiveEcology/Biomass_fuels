@@ -216,7 +216,7 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
                                           hardwoodDom = 0L),
          by = "pixelGroup"]
   tempDT[hardwoodDom < hardwoodMax,
-         finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+         finalFuelType2 := last(finalFuelType[grepl("conifer", variable)]),
          by = "pixelGroup"]
   tempDT[hardwoodDom < hardwoodMax,
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
@@ -224,11 +224,13 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
 
   ## if the proportion of conifers is lower than the threshold,
   ## the stand is considered pure deciduous and gets the corresponding fuel type
+  ## TODO: from my C# understanding, LANDIS assigns the last deciduous FT in the table,
+  ## if there are several final deciduous FTs with the same biomass - I don't like this at all
   tempDT[coniferDom < hardwoodMax, `:=` (coniferDom = 0L,
                                          hardwoodDom = 100L),
          by = "pixelGroup"]
   tempDT[coniferDom < hardwoodMax,
-         finalFuelType2 := finalFuelType[grepl("decid", variable)],
+         finalFuelType2 := last(finalFuelType[grepl("decid", variable)]),
          by = "pixelGroup"]
   tempDT[coniferDom < hardwoodMax,
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
@@ -247,8 +249,11 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
   # tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
   #        finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
   #        by = "pixelGroup"]
-  tempDT[(coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax),
-         finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+
+  ## TODO 2: from my C# understanding, LANDIS assigns the last conifer FT in the table,
+  ## if there are several final conifer FTs with the same biomass - I don't like this at all
+  tempDT[coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax,
+         finalFuelType2 := last(finalFuelType[grepl("conifer", variable)]),
          by = "pixelGroup"]
   tempDT[(coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax),
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
