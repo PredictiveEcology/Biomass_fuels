@@ -33,7 +33,7 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
             by = "pixelGroup"]
   setkey(coniferDT, pixelGroup)
   setkey(pixelGroupFuelTypes, pixelGroup)
-  pixelGroupFuelTypes <- coniferDT[, .(pixelGroup, sumConifer)][pixelGroupFuelTypes, nomatch = NA]
+  pixelGroupFuelTypes <- unique(coniferDT[, .(pixelGroup, sumConifer)])[pixelGroupFuelTypes, nomatch = NA]
   rm(coniferDT)
 
   ## sum deciduous fuel types per pixelGroup and join
@@ -42,7 +42,7 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
              by = "pixelGroup"]
   setkey(deciduousDT, pixelGroup)
   setkey(pixelGroupFuelTypes, pixelGroup)
-  pixelGroupFuelTypes <- deciduousDT[, .(pixelGroup, sumDecid)][pixelGroupFuelTypes, nomatch = NA]
+  pixelGroupFuelTypes <- unique(deciduousDT[, .(pixelGroup, sumDecid)])[pixelGroupFuelTypes, nomatch = NA]
   rm(deciduousDT)
 
   pixelGroupFuelTypes[is.na(sumConifer), sumConifer := 0]
