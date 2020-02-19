@@ -134,8 +134,8 @@ calcFuelTypes <- function(sim) {
   tempFT <- na.omit(copy(sim$ForestFuelTypes[, -c("FuelTypeDesc"), with = FALSE]))  ## keep only complete lines with spp codes
 
   ## merge the two tables
-  pixelGroupFuelTypes <- pixelGroupFuelTypes[tempFT, on = .(speciesCode),
-                                             allow.cartesian = TRUE, nomatch = NA]
+  pixelGroupFuelTypes <- tempFT[pixelGroupFuelTypes, on = .(speciesCode),
+                                allow.cartesian = TRUE, nomatch = NA]
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("FuelTypeFBP", "FuelType", "BaseFuel", "minAge",
               "maxAge", "speciesCode", "negSwitch")
@@ -145,9 +145,8 @@ calcFuelTypes <- function(sim) {
   }
 
   ## add sppMultipliers
-  browser()
-  pixelGroupFuelTypes <- pixelGroupFuelTypes[sim$sppMultipliers[,.(speciesCode, Coefficient)],
-                                             on = .(speciesCode), nomatch = NA]
+  pixelGroupFuelTypes <- sim$sppMultipliers[, .(speciesCode, Coefficient)][pixelGroupFuelTypes,
+                                                                           on = .(speciesCode), nomatch = NA]
   if (isTRUE(getOption("LandR.assertions"))) {
     cols <- c("Coefficient")
     if (any(is.na(pixelGroupFuelTypes[, ..cols]))) {
@@ -155,9 +154,8 @@ calcFuelTypes <- function(sim) {
     }
   }
 
-
   ## add fuel type ecoregions and remove fuel types in the wrong regions.
-  pixelGroupFuelTypes <- pixelGroupFuelTypes[sim$fTypeEcoreg, on = .(FuelType), nomatch = NA]
+  pixelGroupFuelTypes <- sim$fTypeEcoreg[pixelGroupFuelTypes, on = .(FuelType), nomatch = NA]
   pixelGroupFuelTypes <- pixelGroupFuelTypes[, ftEcoregion := as.numeric(Ecoregions)]
   pixelGroupFuelTypes <- pixelGroupFuelTypes[, Ecoregions := NULL]
 
