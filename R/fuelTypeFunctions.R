@@ -232,10 +232,20 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
   ## if both the proportion of conifers and deciduous are higher than the threshold,
   ## the proportions are left untouched (like a mixed stand)
   ## and the fuel type is considered to be coniferous
-  tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+
+  ## TODO: this, or the conditions above, seems to have a bug, has if coniferDom/hardwoodDom are = hardwoodMax
+  ## there will be no fuel type assigned ## issue #7 in LANDIS-II-Foundation/Extension-Dynamic-Biomass-Fuels
+  ## I "corrected" to >= below, in the mean time
+  # tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+  #        finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+  #        by = "pixelGroup"]
+  # tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+  #        finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
+  #        by = "pixelGroup"]
+  tempDT[(coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax),
          finalFuelType2 := finalFuelType[grepl("conifer", variable)],
          by = "pixelGroup"]
-  tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+  tempDT[(coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax),
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
          by = "pixelGroup"]
 
