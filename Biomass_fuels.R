@@ -312,36 +312,6 @@ calcFuelTypes <- function(sim) {
     dynamicBiomassFuels[col1 == "Type", col1 := "FuelType"]
   }
 
-  ## SPECIES COEFFICIENTS ---------------------------------
-  if (!suppliedElsewhere("sppMultipliers", sim)) {
-    if (file.exists(file.path(dPath, "sppMultipliers.csv"))) {
-      sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
-                                   destinationPath = dPath,
-                                   fun = "read.csv",
-                                   header = TRUE)
-      sppMultipliers <- data.table(sppMultipliers)
-
-      ## make sure columns are the right types
-      sppMultipliers[, Coefficient := as.numeric(Coefficient)]
-    } else {
-      message(paste0("Can't find sppMultipliers.csv in ", dPath,
-                     ".\nUsing LANDIS example file"))
-
-      sppMultipliers <- dynamicBiomassFuels[(which(col1=="Fuel") + 1) : (which(col1 == "HardwoodMaximum") - 1),
-                                            col1:col2]
-
-      names(sppMultipliers) <- as.character(sppMultipliers[1,])
-      sppMultipliers <- sppMultipliers[-1]
-      sppMultipliers[, Coefficient := as.numeric(Coefficient)]
-
-      # sim$sppMultipliers <- copy(sppMultipliers)
-    }
-    sppMultipliers <- prepSppMultipliers(sppMultipliers,
-                                         sppEquiv = sim$sppEquiv,
-                                         sppEquivCol = P(sim)$sppEquivCol)
-    sim$sppMultipliers <- sppMultipliers
-  }
-
   ## FUEL TYPES TABLE -------------------------------------
   if (!suppliedElsewhere("ForestFuelTypes", sim)) {
     if (file.exists(file.path(dPath, "ForestFuelTypes.csv"))) {
@@ -381,6 +351,41 @@ calcFuelTypes <- function(sim) {
                                      sppEquivCol = P(sim)$sppEquivCol)
 
     sim$ForestFuelTypes <- ForestFuelTypes
+  }
+
+  ## SPECIES COEFFICIENTS ---------------------------------
+  if (!suppliedElsewhere("sppMultipliers", sim)) {
+    if (file.exists(file.path(dPath, "sppMultipliers.csv"))) {
+      sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
+                                   destinationPath = dPath,
+                                   fun = "read.csv",
+                                   header = TRUE)
+      sppMultipliers <- data.table(sppMultipliers)
+
+      ## make sure columns are the right types
+      sppMultipliers[, Coefficient := as.numeric(Coefficient)]
+    } else {
+      message(paste0("Can't find sppMultipliers.csv in ", dPath,
+                     ".\nUsing LANDIS example file"))
+
+      sppMultipliers <- dynamicBiomassFuels[(which(col1=="Fuel") + 1) : (which(col1 == "HardwoodMaximum") - 1),
+                                            col1:col2]
+
+      names(sppMultipliers) <- as.character(sppMultipliers[1,])
+      sppMultipliers <- sppMultipliers[-1]
+      sppMultipliers[, Coefficient := as.numeric(Coefficient)]
+    }
+    sppMultipliers <- prepSppMultipliers(sppMultipliers,
+                                         sppEquiv = sim$sppEquiv,
+                                         sppEquivCol = P(sim)$sppEquivCol)
+
+    if (!all(sim$ForestFuelTypes$speciesCode %in% sppMultipliers$speciesCode))
+      message("Some species in the 'ForestFuelTypes' table missing from 'sppMultipliers'",
+              "\nThey will be added with a coefficient value of 1 - if this is wrong, supply 'sppMultipliers'")
+    sppMultipliers <- sppMultipliers[sim$ForestFuelTypes[, "speciesCode"],
+                                     on = .(speciesCode), nomatch = NA]
+    sppMultipliers[is.na(Coefficient), Coefficient := 1]
+    sim$sppMultipliers <- unique(sppMultipliers)
   }
 
   ## FUEL TYPES AND ECOREGIONS TABLE ----------------------
