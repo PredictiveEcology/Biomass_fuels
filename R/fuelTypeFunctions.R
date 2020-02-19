@@ -205,12 +205,16 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
   ## calculate the proportion of conifer/deciduous cover
   tempDT[sumConifer > 0 | sumDecid > 0,
          `:=` (coniferDom = as.integer(ceiling(sumConifer/(sumConifer + sumDecid) * 100)),
-               hardwoodDom = as.integer(ceiling(sumDecid/(sumConifer + sumDecid) * 100)))]
+               hardwoodDom = as.integer(ceiling(sumDecid/(sumConifer + sumDecid) * 100))),
+         by = "pixelGroup"]
 
   ## if the proportion of deciduous is lower than the threshold,
   ## the stand is considered pure conifer and gets the corresponding fuel type
+  ## TODO: from my C# understanding, LANDIS assigns the last conifer FT in the table,
+  ## if there are several final conifer FTs with the same biomass - I don't like this at all
   tempDT[hardwoodDom < hardwoodMax, `:=` (coniferDom = 100L,
-                                          hardwoodDom = 0L)]
+                                          hardwoodDom = 0L),
+         by = "pixelGroup"]
   tempDT[hardwoodDom < hardwoodMax,
          finalFuelType2 := finalFuelType[grepl("conifer", variable)],
          by = "pixelGroup"]
@@ -221,7 +225,8 @@ calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
   ## if the proportion of conifers is lower than the threshold,
   ## the stand is considered pure deciduous and gets the corresponding fuel type
   tempDT[coniferDom < hardwoodMax, `:=` (coniferDom = 0L,
-                                         hardwoodDom = 100L)]
+                                         hardwoodDom = 100L),
+         by = "pixelGroup"]
   tempDT[coniferDom < hardwoodMax,
          finalFuelType2 := finalFuelType[grepl("decid", variable)],
          by = "pixelGroup"]
