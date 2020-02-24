@@ -4,13 +4,13 @@
 #' following the LANDIS-II Dynamic Biomass Fuels Extention v2.2 - 15 Jun 2017.
 #' Note that there is no "Mixed" fuel type in LANDIS, as it becomes either conifer or deciduous.
 #' In a mixed stand case, the proportion of conifers and deciduous biomass is used later necessary to \
-#' for Fire Behaviour Predition system calcualtions
+#' for Fire Behaviour Predition system calculations
 #'
-#' @param pixelFuelTypes a \code{data.table} with fuel types per pixel group, calculated from cohort biomasses
+#' @param pixelGroupFuelTypes a \code{data.table} with fuel types per pixel group, calculated from cohort biomasses
 #' @param hardwoodMax an \code{integer} that defined the threshold of percent biomass below which fuel
 #'    types are considered conifer or mixed. Defaults to 15, as in LANDIS example file
 #'
-#' @return an updated \code{pixelFuelTypes} \code{data.table} with the added columns:
+#' @return an updated \code{pixelGroupFuelTypes} \code{data.table} with the added columns:
 #'    finalFuelType - the final fuel type (\code{integer}),
 #'    finalBaseFuel - th final base fuel (\code{character}),
 #'    coniferDom and hardwoodDom - the proportion of conifer and deciduous biomass.
@@ -18,42 +18,42 @@
 #' @export
 #' @importFrom data.table set setkey rbind
 
-calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
-  pixelFuelTypes <- pixelFuelTypes[, .(BaseFuel, FuelType, forTypValue, maxValue,
+calcFinalFuels <- function(pixelGroupFuelTypes, hardwoodMax) {
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[, .(BaseFuel, FuelType, forTypValue, maxValue,
                                        pixelGroup)]
-  pixelFuelTypes <- pixelFuelTypes[!duplicated(pixelFuelTypes)]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[!duplicated(pixelGroupFuelTypes)]
 
   ## ignore "mixed" fuel type
-  pixelFuelTypes <- pixelFuelTypes[BaseFuel != "Mixed"]
+  pixelGroupFuelTypes <- pixelGroupFuelTypes[BaseFuel != "Mixed"]
 
   ## CALCULATE CONIFEROUS/DECIDUOUS DOMINANCE ----
   ## sum conifer fuel types per pixelGroup and join
-  coniferDT <- pixelFuelTypes[grepl("Conifer", BaseFuel)]
+  coniferDT <- pixelGroupFuelTypes[grepl("Conifer", BaseFuel)]
   coniferDT[, sumConifer := sum(forTypValue, na.rm = TRUE),
             by = "pixelGroup"]
   setkey(coniferDT, pixelGroup)
-  setkey(pixelFuelTypes, pixelGroup)
-  pixelFuelTypes <- coniferDT[, .(pixelGroup, sumConifer)][pixelFuelTypes, nomatch = NA]
+  setkey(pixelGroupFuelTypes, pixelGroup)
+  pixelGroupFuelTypes <- unique(coniferDT[, .(pixelGroup, sumConifer)])[pixelGroupFuelTypes, nomatch = NA]
   rm(coniferDT)
 
   ## sum deciduous fuel types per pixelGroup and join
-  deciduosDT <- pixelFuelTypes[grepl("Deciduous", BaseFuel)]
-  deciduosDT[, sumDecid := sum(forTypValue, na.rm = TRUE),
+  deciduousDT <- pixelGroupFuelTypes[grepl("Deciduous", BaseFuel)]
+  deciduousDT[, sumDecid := sum(forTypValue, na.rm = TRUE),
              by = "pixelGroup"]
-  setkey(deciduosDT, pixelGroup)
-  setkey(pixelFuelTypes, pixelGroup)
-  pixelFuelTypes <- deciduosDT[, .(pixelGroup, sumDecid)][pixelFuelTypes, nomatch = NA]
-  rm(deciduosDT)
+  setkey(deciduousDT, pixelGroup)
+  setkey(pixelGroupFuelTypes, pixelGroup)
+  pixelGroupFuelTypes <- unique(deciduousDT[, .(pixelGroup, sumDecid)])[pixelGroupFuelTypes, nomatch = NA]
+  rm(deciduousDT)
 
-  pixelFuelTypes[is.na(sumConifer), sumConifer := 0]
-  pixelFuelTypes[is.na(sumDecid), sumDecid := 0]
+  pixelGroupFuelTypes[is.na(sumConifer), sumConifer := 0]
+  pixelGroupFuelTypes[is.na(sumDecid), sumDecid := 0]
 
   ## DETERMINE DOMINANT FUEL TYPES PER BASE FUEL
   ## NOTE: if several fuel types have the maximum biomass
   ## for a given base fuel, they'll win based on table order
 
   ## determine the dominant conifer fuel type
-  coniferDT <- pixelFuelTypes[grepl("Conifer", BaseFuel)]
+  coniferDT <- pixelGroupFuelTypes[grepl("Conifer", BaseFuel)]
   coniferPlantDT <- coniferDT[grepl("Plantation", coniferDT$BaseFuel)]
   coniferDT <- coniferDT[!grepl("Plantation", coniferDT$BaseFuel)]
 
@@ -85,19 +85,19 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
     coniferDT[, coniferMaxValue := integer(0)]
 
   ## determine the dominant deciduous fuel type
-  deciduosDT <- pixelFuelTypes[grepl("Deciduous", BaseFuel)]
-  if (NROW(deciduosDT)) {
-    deciduosDT[, decidMaxValue := max(forTypValue, na.rm = TRUE),
+  deciduousDT <- pixelGroupFuelTypes[grepl("Deciduous", BaseFuel)]
+  if (NROW(deciduousDT)) {
+    deciduousDT[, decidMaxValue := max(forTypValue, na.rm = TRUE),
                by = "pixelGroup"]
-    deciduosDT[forTypValue == decidMaxValue, finalFuelType := FuelType,
+    deciduousDT[forTypValue == decidMaxValue, finalFuelType := FuelType,
                by = "pixelGroup"]
   }
 
-  if (is.null(deciduosDT[["decidMaxValue"]]))
-    deciduosDT[, decidMaxValue := integer(0)]
+  if (is.null(deciduousDT[["decidMaxValue"]]))
+    deciduousDT[, decidMaxValue := integer(0)]
 
   ## determine the mixed  fuel type -- not used in LANDIS
-  # mixedDT <- pixelFuelTypes[grepl("Mixed", BaseFuel)]
+  # mixedDT <- pixelGroupFuelTypes[grepl("Mixed", BaseFuel)]
   # if (NROW(mixedDT)) {
   #   mixedDT[, mixedMaxValue := max(forTypValue, na.rm = TRUE),
   #           by = "pixelGroup"]
@@ -109,7 +109,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   #   mixedDT[, mixedMaxValue := integer(0)]
 
   ## determine the dominant slash fuel type
-  slashDT <- pixelFuelTypes[grepl("Slash", BaseFuel)]
+  slashDT <- pixelGroupFuelTypes[grepl("Slash", BaseFuel)]
   if (NROW(slashDT)) {
     slashDT[, slashMaxValue := max(forTypValue, na.rm = TRUE),
             by = "pixelGroup"]
@@ -122,7 +122,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
 
 
   ## determine the dominant open fuel type
-  openDT <- pixelFuelTypes[grepl("Open", BaseFuel)]
+  openDT <- pixelGroupFuelTypes[grepl("Open", BaseFuel)]
   if (NROW(openDT)) {
     openDT[, openMaxValue := max(forTypValue, na.rm = TRUE),
            by = "pixelGroup"]
@@ -133,7 +133,7 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   if (is.null(openDT[["openMaxValue"]]))
     openDT[, openMaxValue := integer(0)]
 
-  tempDT <- rbind(coniferDT, deciduosDT, slashDT, openDT, fill = TRUE)
+  tempDT <- rbind(coniferDT, deciduousDT, slashDT, openDT, fill = TRUE)
   ## suppressWarning about coersion
   tempDT <- suppressWarnings(melt(tempDT, id.vars = c("pixelGroup", "sumDecid", "sumConifer",
                                                       "BaseFuel", "FuelType", "forTypValue", "maxValue", "finalFuelType"),
@@ -142,8 +142,8 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
 
   ## RESOLVE COMPETING NON-CONIFEROUS/DECIDUOUS FUEL TYPES ----------------
   ## get the fuel type with the maximum biomass - this will only work for
-  ## plantations, slash and open, since maxValue for conifer/deciduos is
-  ## summed and doens't correspond directly to the values of each of these types
+  ## plantations, slash and open, since maxValue for conifer/deciduous is
+  ## summed and doesn't correspond directly to the values of each of these types
   ## when both exist.
   ## Ties are resolved later
 
@@ -205,37 +205,57 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
   ## calculate the proportion of conifer/deciduous cover
   tempDT[sumConifer > 0 | sumDecid > 0,
          `:=` (coniferDom = as.integer(ceiling(sumConifer/(sumConifer + sumDecid) * 100)),
-               hardwoodDom = as.integer(ceiling(sumDecid/(sumConifer + sumDecid) * 100)))]
+               hardwoodDom = as.integer(ceiling(sumDecid/(sumConifer + sumDecid) * 100))),
+         by = "pixelGroup"]
 
   ## if the proportion of deciduous is lower than the threshold,
   ## the stand is considered pure conifer and gets the corresponding fuel type
+  ## TODO: from my C# understanding, LANDIS assigns the last conifer FT in the table,
+  ## if there are several final conifer FTs with the same biomass - I don't like this at all
   tempDT[hardwoodDom < hardwoodMax, `:=` (coniferDom = 100L,
-                                          hardwoodDom = 0L)]
+                                          hardwoodDom = 0L),
+         by = "pixelGroup"]
   tempDT[hardwoodDom < hardwoodMax,
-         finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+         finalFuelType2 := last(finalFuelType[grepl("conifer", variable)]),
          by = "pixelGroup"]
   tempDT[hardwoodDom < hardwoodMax,
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
          by = "pixelGroup"]
 
   ## if the proportion of conifers is lower than the threshold,
-  ## the stand is considered pure deciduos and gets the corresponding fuel type
+  ## the stand is considered pure deciduous and gets the corresponding fuel type
+  ## TODO: from my C# understanding, LANDIS assigns the last deciduous FT in the table,
+  ## if there are several final deciduous FTs with the same biomass - I don't like this at all
   tempDT[coniferDom < hardwoodMax, `:=` (coniferDom = 0L,
-                                         hardwoodDom = 100L)]
+                                         hardwoodDom = 100L),
+         by = "pixelGroup"]
   tempDT[coniferDom < hardwoodMax,
-         finalFuelType2 := finalFuelType[grepl("decid", variable)],
+         finalFuelType2 := last(finalFuelType[grepl("decid", variable)]),
          by = "pixelGroup"]
   tempDT[coniferDom < hardwoodMax,
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
          by = "pixelGroup"]
 
-  ## if both the proportion of conifers and diciduos are higher than the threshold,
+  ## if both the proportion of conifers and deciduous are higher than the threshold,
   ## the proportions are left untouched (like a mixed stand)
   ## and the fuel type is considered to be coniferous
-  tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
-         finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+
+  ## TODO: this, or the conditions above, seems to have a bug, has if coniferDom/hardwoodDom are = hardwoodMax
+  ## there will be no fuel type assigned ## issue #7 in LANDIS-II-Foundation/Extension-Dynamic-Biomass-Fuels
+  ## I "corrected" to >= below, in the mean time
+  # tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+  #        finalFuelType2 := finalFuelType[grepl("conifer", variable)],
+  #        by = "pixelGroup"]
+  # tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+  #        finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
+  #        by = "pixelGroup"]
+
+  ## TODO 2: from my C# understanding, LANDIS assigns the last conifer FT in the table,
+  ## if there are several final conifer FTs with the same biomass - I don't like this at all
+  tempDT[coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax,
+         finalFuelType2 := last(finalFuelType[grepl("conifer", variable)]),
          by = "pixelGroup"]
-  tempDT[(coniferDom > hardwoodMax & hardwoodDom > hardwoodMax),
+  tempDT[(coniferDom >= hardwoodMax & hardwoodDom >= hardwoodMax),
          finalBaseFuel := as.character(unique(BaseFuel[finalFuelType2 == FuelType])),
          by = "pixelGroup"]
 
@@ -248,8 +268,8 @@ calcFinalFuels <- function(pixelFuelTypes, hardwoodMax) {
             "finalBaseFuel", "finalFuelType")
   tempDT <- unique(tempDT[, ..cols])
 
-  pixelFuelTypes <- tempDT
-  return(pixelFuelTypes)
+  pixelGroupFuelTypes <- tempDT
+  return(pixelGroupFuelTypes)
 }
 
 #' Resolve conflicting fuel types
