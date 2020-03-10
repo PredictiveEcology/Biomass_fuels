@@ -59,8 +59,9 @@ defineModule(sim, list(
     expectsInput("rasterToMatch", "RasterLayer",
                  desc = "a raster of the studyArea in the same resolution and projection as biomassMap",
                  sourceURL = NA),
-    expectsInput("rstLCC", "RasterLayer",
-                 desc = paste("A land classification map in study area. It must be 'corrected', in the sense that:\n",
+    expectsInput("rstLCCRTM", "RasterLayer",
+                 desc = paste("A land classification map in study area, masked to rasterToMatch It must be 'corrected',",
+                              "in the sense that:\n",
                               "1) Every class must not conflict with any other map in this module\n",
                               "    (e.g., speciesLayers should not have data in LCC classes that are non-treed);\n",
                               "2) It can have treed and non-treed classes. The non-treed will be removed within this\n",
@@ -70,8 +71,6 @@ defineModule(sim, list(
                               "    neighbour class, based on P(sim)$LCCClassesToReplaceNN.\n",
                               "The default layer used, if not supplied, is Canada national land classification in 2005"),
                  sourceURL = "https://drive.google.com/file/d/1g9jr0VrQxqxGjZ4ckF6ZkSMP-zuYzHQC/view?usp=sharing"),
-    expectsInput(objectName = "rstLCCRTM", objectClass = "RasterLayer",
-                 desc = "Same as rstLCC, but masked to rasterToMatch"),
     expectsInput(objectName = "sppEquiv", objectClass = "data.table",
                  desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
                  sourceURL = ""),
@@ -433,151 +432,144 @@ calcFuelTypes <- function(sim) {
 
   ## LAND COVER RASTERS ----------------------------------
   if (!suppliedElsewhere("rstLCCRTM", sim)) {
-    if (!suppliedElsewhere("rstLCC", sim)) {
+    if (!suppliedElsewhere("studyArea", sim)) {
+      message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
+      sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
+    }
 
-      if (!suppliedElsewhere("studyArea", sim)) {
-        message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
-        sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
-      }
+    if (!suppliedElsewhere("studyAreaLarge", sim)) {
+      message("'studyAreaLarge' was not provided by user. Using the same as 'studyArea'")
+      sim <- objectSynonyms(sim, list(c("studyAreaLarge", "studyArea")))
+    }
 
-      if (!suppliedElsewhere("studyAreaLarge", sim)) {
-        message("'studyAreaLarge' was not provided by user. Using the same as 'studyArea'")
-        sim <- objectSynonyms(sim, list(c("studyAreaLarge", "studyArea")))
-      }
-
-      if (!identical(crs(sim$studyArea), crs(sim$studyAreaLarge))) {
-        warning("studyArea and studyAreaLarge have different projections.\n
+    if (!identical(crs(sim$studyArea), crs(sim$studyAreaLarge))) {
+      warning("studyArea and studyAreaLarge have different projections.\n
             studyAreaLarge will be projected to match crs(studyArea)")
-        sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$studyArea))
-      }
+      sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$studyArea))
+    }
 
-      ## check whether SA is within SALarge
-      ## convert to temp sf objects
-      studyArea <- st_as_sf(sim$studyArea)
-      studyAreaLarge <- st_as_sf(sim$studyAreaLarge)
+    ## check whether SA is within SALarge
+    ## convert to temp sf objects
+    studyArea <- st_as_sf(sim$studyArea)
+    studyAreaLarge <- st_as_sf(sim$studyAreaLarge)
 
-      if (!st_within(studyArea, studyAreaLarge)[[1]])
-        stop("studyArea is not fully within studyAreaLarge.
+    if (!st_within(studyArea, studyAreaLarge)[[1]])
+      stop("studyArea is not fully within studyAreaLarge.
            Please check the aligment, projection and shapes of these polygons")
-      rm(studyArea, studyAreaLarge)
+    rm(studyArea, studyAreaLarge)
 
-      ## Raster(s) to match ------------------------------------------------
-      needRTM <- FALSE
-      if (is.null(sim$rasterToMatch) || is.null(sim$rasterToMatchLarge)) {
-        if (!suppliedElsewhere("rasterToMatch", sim) ||
-            !suppliedElsewhere("rasterToMatchLarge", sim)) {      ## if one is not provided, re do both (safer?)
-          needRTM <- TRUE
-          message("There is no rasterToMatch/rasterToMatchLarge supplied; will attempt to use rawBiomassMap")
-        } else {
-          stop("rasterToMatch/rasterToMatchLarge is going to be supplied, but ", currentModule(sim), " requires it ",
-               "as part of its .inputObjects. Please make it accessible to ", currentModule(sim),
-               " in the .inputObjects by passing it in as an object in simInit(objects = list(rasterToMatch = aRaster)",
-               " or in a module that gets loaded prior to ", currentModule(sim))
-        }
+    ## Raster(s) to match ------------------------------------------------
+    needRTM <- FALSE
+    if (is.null(sim$rasterToMatch) || is.null(sim$rasterToMatchLarge)) {
+      if (!suppliedElsewhere("rasterToMatch", sim) ||
+          !suppliedElsewhere("rasterToMatchLarge", sim)) {      ## if one is not provided, re do both (safer?)
+        needRTM <- TRUE
+        message("There is no rasterToMatch/rasterToMatchLarge supplied; will attempt to use rawBiomassMap")
+      } else {
+        stop("rasterToMatch/rasterToMatchLarge is going to be supplied, but ", currentModule(sim), " requires it ",
+             "as part of its .inputObjects. Please make it accessible to ", currentModule(sim),
+             " in the .inputObjects by passing it in as an object in simInit(objects = list(rasterToMatch = aRaster)",
+             " or in a module that gets loaded prior to ", currentModule(sim))
       }
+    }
 
-      if (needRTM) {
-        if (!suppliedElsewhere("rawBiomassMap", sim)) {
-          sim$rawBiomassMap <- Cache(prepInputs,
-                                     targetFile = asPath(basename(rawBiomassMapFilename)),
-                                     archive = asPath(c("kNN-StructureBiomass.tar",
-                                                        "NFI_MODIS250m_kNN_Structure_Biomass_TotalLiveAboveGround_v0.zip")),
-                                     url = extractURL("rawBiomassMap"),
-                                     destinationPath = dPath,
-                                     studyArea = sim$studyAreaLarge,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
-                                     # studyArea = sim$studyArea,
-                                     rasterToMatch = if (!needRTM) sim$rasterToMatchLarge else NULL,
-                                     # maskWithRTM = TRUE,    ## if RTM not supplied no masking happens (is this intended?)
-                                     maskWithRTM = if (!needRTM) TRUE else FALSE,
-                                     ## TODO: if RTM is not needed use SA CRS? -> this is not correct
-                                     # useSAcrs = if (!needRTM) TRUE else FALSE,
-                                     useSAcrs = FALSE,     ## never use SA CRS
-                                     method = "bilinear",
-                                     datatype = "INT2U",
-                                     filename2 = TRUE, overwrite = TRUE,
-                                     userTags = cacheTags,
-                                     omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
-        }
-        ## if we need rasterToMatch/rasterToMatchLarge, that means a) we don't have it, but b) we will have rawBiomassMap
-        ## even if one of the rasterToMatch is present re-do both.
-
-        if (is.null(sim$rasterToMatch) != is.null(sim$rasterToMatchLarge))
-          warning(paste0("One of rasterToMatch/rasterToMatchLarge is missing. Both will be created \n",
-                         "from rawBiomassMap and studyArea/studyAreaLarge.\n
-              If this is wrong, provide both rasters"))
-
-        sim$rasterToMatchLarge <- sim$rawBiomassMap
-        RTMvals <- getValues(sim$rasterToMatchLarge)
-        sim$rasterToMatchLarge[!is.na(RTMvals)] <- 1
-
-        sim$rasterToMatchLarge <- Cache(writeOutputs, sim$rasterToMatchLarge,
-                                        filename2 = file.path(cachePath(sim), "rasters", "rasterToMatchLarge.tif"),
-                                        datatype = "INT2U", overwrite = TRUE,
-                                        userTags = cacheTags,
-                                        omitArgs = c("userTags"))
-
-        sim$rasterToMatch <- Cache(postProcess,
-                                   x = sim$rawBiomassMap,
-                                   studyArea = sim$studyArea,
-                                   rasterToMatch = sim$rasterToMatchLarge,
-                                   useSAcrs = FALSE,
-                                   maskWithRTM = FALSE,   ## mask with SA
+    if (needRTM) {
+      if (!suppliedElsewhere("rawBiomassMap", sim)) {
+        sim$rawBiomassMap <- Cache(prepInputs,
+                                   targetFile = asPath(basename(rawBiomassMapFilename)),
+                                   archive = asPath(c("kNN-StructureBiomass.tar",
+                                                      "NFI_MODIS250m_kNN_Structure_Biomass_TotalLiveAboveGround_v0.zip")),
+                                   url = extractURL("rawBiomassMap"),
+                                   destinationPath = dPath,
+                                   studyArea = sim$studyAreaLarge,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
+                                   # studyArea = sim$studyArea,
+                                   rasterToMatch = if (!needRTM) sim$rasterToMatchLarge else NULL,
+                                   # maskWithRTM = TRUE,    ## if RTM not supplied no masking happens (is this intended?)
+                                   maskWithRTM = if (!needRTM) TRUE else FALSE,
+                                   ## TODO: if RTM is not needed use SA CRS? -> this is not correct
+                                   # useSAcrs = if (!needRTM) TRUE else FALSE,
+                                   useSAcrs = FALSE,     ## never use SA CRS
                                    method = "bilinear",
                                    datatype = "INT2U",
-                                   filename2 = file.path(cachePath(sim), "rasterToMatch.tif"),
-                                   overwrite = TRUE,
+                                   filename2 = TRUE, overwrite = TRUE,
                                    userTags = cacheTags,
                                    omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
-
-        ## covert to 'mask'
-        RTMvals <- getValues(sim$rasterToMatch)
-        sim$rasterToMatch[!is.na(RTMvals)] <- 1
       }
+      ## if we need rasterToMatch/rasterToMatchLarge, that means a) we don't have it, but b) we will have rawBiomassMap
+      ## even if one of the rasterToMatch is present re-do both.
 
-      if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
-        warning(paste0("studyArea and rasterToMatch projections differ.\n",
-                       "studyArea will be projected to match rasterToMatch"))
-        sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
-        sim$studyArea <- fixErrors(sim$studyArea)
-      }
+      if (is.null(sim$rasterToMatch) != is.null(sim$rasterToMatchLarge))
+        warning(paste0("One of rasterToMatch/rasterToMatchLarge is missing. Both will be created \n",
+                       "from rawBiomassMap and studyArea/studyAreaLarge.\n
+              If this is wrong, provide both rasters"))
 
-      if (!identical(crs(sim$studyAreaLarge), crs(sim$rasterToMatchLarge))) {
-        warning(paste0("studyAreaLarge and rasterToMatchLarge projections differ.\n",
-                       "studyAreaLarge will be projected to match rasterToMatchLarge"))
-        sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$rasterToMatchLarge))
-        sim$studyAreaLarge <- fixErrors(sim$studyAreaLarge)
-      }
+      sim$rasterToMatchLarge <- sim$rawBiomassMap
+      RTMvals <- getValues(sim$rasterToMatchLarge)
+      sim$rasterToMatchLarge[!is.na(RTMvals)] <- 1
 
-      sim$rstLCC <- Cache(prepInputs,
-                          targetFile = lcc2005Filename,
-                          archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
-                          url = extractURL("rstLCC"),
-                          destinationPath = dPath,
-                          studyArea = sim$studyAreaLarge,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
-                          # studyArea = sim$studyArea,
-                          rasterToMatch = sim$rasterToMatchLarge,
-                          # rasterToMatch = sim$rasterToMatch,
-                          maskWithRTM = TRUE,
-                          method = "bilinear",
-                          datatype = "INT2U",
-                          filename2 = FALSE, overwrite = TRUE,
-                          userTags = c("prepInputsrstLCC_rtm", cacheTags), # use at least 1 unique userTag
-                          omitArgs = c("destinationPath", "targetFile", "userTags"))
+      sim$rasterToMatchLarge <- Cache(writeOutputs, sim$rasterToMatchLarge,
+                                      filename2 = file.path(cachePath(sim), "rasters", "rasterToMatchLarge.tif"),
+                                      datatype = "INT2U", overwrite = TRUE,
+                                      userTags = cacheTags,
+                                      omitArgs = c("userTags"))
+
+      sim$rasterToMatch <- Cache(postProcess,
+                                 x = sim$rawBiomassMap,
+                                 studyArea = sim$studyArea,
+                                 rasterToMatch = sim$rasterToMatchLarge,
+                                 useSAcrs = FALSE,
+                                 maskWithRTM = FALSE,   ## mask with SA
+                                 method = "bilinear",
+                                 datatype = "INT2U",
+                                 filename2 = file.path(cachePath(sim), "rasterToMatch.tif"),
+                                 overwrite = TRUE,
+                                 userTags = cacheTags,
+                                 omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+
+      ## covert to 'mask'
+      RTMvals <- getValues(sim$rasterToMatch)
+      sim$rasterToMatch[!is.na(RTMvals)] <- 1
     }
 
-    rstLCCRTM <- sim$rstLCC
-
-    if (!compareRaster(rstLCCRTM, sim$rasterToMatch, values = FALSE, stopiffalse = FALSE)) {
-      rstLCCRTM <- Cache(postProcess,
-                         x = rstLCCRTM,
-                         rasterToMatch = sim$rasterToMatch,
-                         maskWithRTM = TRUE,
-                         filename2 = NULL,
-                         userTags = cacheTags,
-                         omitArgs = "userTags")
+    if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
+      warning(paste0("studyArea and rasterToMatch projections differ.\n",
+                     "studyArea will be projected to match rasterToMatch"))
+      sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
+      sim$studyArea <- fixErrors(sim$studyArea)
     }
 
-    sim$rstLCCRTM <- rstLCCRTM
+    if (!identical(crs(sim$studyAreaLarge), crs(sim$rasterToMatchLarge))) {
+      warning(paste0("studyAreaLarge and rasterToMatchLarge projections differ.\n",
+                     "studyAreaLarge will be projected to match rasterToMatchLarge"))
+      sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$rasterToMatchLarge))
+      sim$studyAreaLarge <- fixErrors(sim$studyAreaLarge)
+    }
+
+    if (!suppliedElsewhere("rstLCC", sim)) {
+    sim$rstLCCRTM <- Cache(prepInputs,
+                           targetFile = lcc2005Filename,
+                           archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
+                           url = extractURL("rstLCC"),
+                           destinationPath = dPath,
+                           studyArea = sim$studyArea,
+                           rasterToMatch = sim$rasterToMatch,
+                           maskWithRTM = TRUE,
+                           method = "ngb",
+                           datatype = "INT2U",
+                           filename2 = FALSE, overwrite = TRUE,
+                           userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
+                           omitArgs = c("destinationPath", "targetFile", "userTags"))
+    } else {
+      sim$rstLCCRTM <- Cache(postProcess,
+                             x = sim$rstLCC,
+                             rasterToMatch = sim$rasterToMatch,
+                             method = "ngb",
+                             maskWithRTM = TRUE,
+                             filename2 = NULL,
+                             userTags = c("prepInputsrstLCCRTM", cacheTags),
+                             omitArgs = "userTags")
+    }
+
   }
 
   return(invisible(sim))
