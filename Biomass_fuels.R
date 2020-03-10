@@ -46,12 +46,12 @@ defineModule(sim, list(
                               "their - or + contribution ('negSwitch'), min and max age for each species (see LANDIS-II",
                               "Dynamic Fire System Extension (v2.1) User Guide). Fuel types come from CF Fire Behaviour",
                               "Prediction System (2nd Ed.). Default values adapted from",
-                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")),
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt")),
     expectsInput(objectName = "fTypeEcoreg", objectClass = "data.table",
                  desc = paste("Table of Fuel Types per Ecoregion (optional, see LANDIS-II Dynamic Fire System",
                               "Extension (v2.1) User Guide). Fuel types come from CF Fire Behaviour Prediction System (2nd Ed.)",
                               "Default values adapted from",
-                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")),
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt")),
     expectsInput(objectName = "nonForestFuelsTable", objectClass = "data.table",
                  desc = paste("Table of correspondence between non-forested land-cover classes and fire fuels.",
                               "Fuel types come from CF Fire Behaviour Prediction System (2nd Ed.). Default values",
@@ -79,7 +79,7 @@ defineModule(sim, list(
                  desc = paste("Table of species biomass coefficient weights.",
                               "Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension",
                               "(v2.1) User Guide). Default values adapted from ",
-                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"))
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt"))
   ),
   outputObjects = bind_rows(
     createsOutput(objectName = "fuelTypesMaps", objectClass = "list",
@@ -291,7 +291,7 @@ calcFuelTypes <- function(sim) {
     dynamicBiomassFuels <- Cache(prepInputs,targetFile = "dynamic-biomass-fuels.txt",
                                  url = paste0("https://raw.githubusercontent.com/CeresBarros/",
                                               "Extension-Dynamic-Biomass-Fuels/master/testings/",
-                                              "version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
+                                              "v6.0-2.0/dynamic-biomass-fuels.txt"),
                                  destinationPath = dPath,
                                  fun = "utils::read.table",
                                  fill = TRUE, row.names = NULL,
