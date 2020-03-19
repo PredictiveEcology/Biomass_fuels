@@ -412,7 +412,7 @@ calcFuelTypes <- function(sim) {
   ## FUEL TYPES FOR NON-FOREST LAND-COVER CLASSES ------
   if (P(sim)$nonForestFire) {
     if (!suppliedElsewhere("nonForestFuelsTable", sim)) {
-      ## for non forest fuels classified as open vegetation/grassland (O1, O2)
+      ## for non forest fuels classified as open vegetation/grassland (O1a, O1b)
       ## the decree of curing needs to be defined, and whether it is fixed (only mean necessary)
       ## or drawn from a distribution (mean, min and max required)
       ## if drawn from a distribution, a normal distribution with right-side fat tail will be used (Perrakis, pers. comm.)
