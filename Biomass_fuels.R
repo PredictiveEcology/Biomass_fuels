@@ -316,9 +316,8 @@ calcFuelTypes <- function(sim) {
     if (file.exists(file.path(dPath, "ForestFuelTypes.csv"))) {
       ForestFuelTypes <- prepInputs(targetFile = "ForestFuelTypes.csv",
                                     destinationPath = dPath,
-                                    fun = "utils::read.csv",
+                                    fun = "data.table::fread",
                                     header = TRUE)
-      ForestFuelTypes <- data.table(ForestFuelTypes)
     } else {
       message(paste0("Can't find ForestFuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
@@ -357,9 +356,8 @@ calcFuelTypes <- function(sim) {
     if (file.exists(file.path(dPath, "sppMultipliers.csv"))) {
       sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
                                    destinationPath = dPath,
-                                   fun = "read.csv",
+                                   fun = "data.table::fread",
                                    header = TRUE)
-      sppMultipliers <- data.table(sppMultipliers)
 
       ## make sure columns are the right types
       sppMultipliers[, Coefficient := as.numeric(Coefficient)]
@@ -392,10 +390,9 @@ calcFuelTypes <- function(sim) {
     if (file.exists(file.path(dPath, "fTypesEcoregions.csv"))) {
       fTypeEcoreg <- prepInputs(targetFile = "fTypesEcoregions.csv",
                                 destinationPath = dPath,
-                                fun = "utils::read.csv",
+                                fun = "data.table::fread",
                                 header = TRUE,
                                 userTags = cacheTags)
-      fTypeEcoreg <- data.table(fTypeEcoreg)
     } else {
       message(paste0("Can't find fTypesEcoregions.csv in ", dPath,
                      ".\nAssigning NAs to ecoregions in sim$fTypeEcoreg"))
