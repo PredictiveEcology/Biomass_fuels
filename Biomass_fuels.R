@@ -253,6 +253,21 @@ calcFuelTypes <- function(sim) {
     fuelTypesMaps$curing[] <- NA
   }
 
+  ##  add levels to fuel types raster
+  fuelTypesMaps$finalFuelType <- ratify(fuelTypesMaps$finalFuelType)
+  levs <- as.data.table(raster::levels(fuelTypesMaps$finalFuelType)[[1]])
+  levs2 <- rbind(unique(pixelGroupFuelTypes[, .(finalFuelType, FuelTypeFBP)]),
+                 unique(sim$pixelNonForestFuels[, .(finalFuelType, FuelTypeFBP)]),
+                 use.names = TRUE) %>%
+    unique(.)
+  setnames(levs2, "finalFuelType", "ID")
+  levs <- levs2[levs, on = "ID"]
+  levels(fuelTypesMaps$finalFuelType) <- as.data.frame(levs)
+  setColors(fuelTypesMaps$finalFuelType, n = nrow(levs)) <- brewer.pal(n = nrow(levs), "Accent")
+
+  ## export to sim
+  sim$fuelTypesMaps <- fuelTypesMaps
+
   ## export to sim
   sim$fuelTypesMaps <- fuelTypesMaps
 
