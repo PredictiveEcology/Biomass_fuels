@@ -449,36 +449,14 @@ calcFuelTypes <- function(sim) {
       sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
     }
 
-    if (!suppliedElsewhere("studyAreaLarge", sim)) {
-      message("'studyAreaLarge' was not provided by user. Using the same as 'studyArea'")
-      sim <- objectSynonyms(sim, list(c("studyAreaLarge", "studyArea")))
-    }
-
-    if (!identical(crs(sim$studyArea), crs(sim$studyAreaLarge))) {
-      warning("studyArea and studyAreaLarge have different projections.\n
-            studyAreaLarge will be projected to match crs(studyArea)")
-      sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$studyArea))
-    }
-
-    ## check whether SA is within SALarge
-    ## convert to temp sf objects
-    studyArea <- st_as_sf(sim$studyArea)
-    studyAreaLarge <- st_as_sf(sim$studyAreaLarge)
-
-    if (!st_within(studyArea, studyAreaLarge)[[1]])
-      stop("studyArea is not fully within studyAreaLarge.
-           Please check the aligment, projection and shapes of these polygons")
-    rm(studyArea, studyAreaLarge)
-
     ## Raster(s) to match ------------------------------------------------
     needRTM <- FALSE
-    if (is.null(sim$rasterToMatch) || is.null(sim$rasterToMatchLarge)) {
-      if (!suppliedElsewhere("rasterToMatch", sim) ||
-          !suppliedElsewhere("rasterToMatchLarge", sim)) {      ## if one is not provided, re do both (safer?)
+    if (is.null(sim$rasterToMatch)) {
+      if (!suppliedElsewhere("rasterToMatch", sim)) {      ## if one is not provided, re do both (safer?)
         needRTM <- TRUE
-        message("There is no rasterToMatch/rasterToMatchLarge supplied; will attempt to use rawBiomassMap")
+        message("There is no rasterToMatch supplied; will attempt to use rawBiomassMap")
       } else {
-        stop("rasterToMatch/rasterToMatchLarge is going to be supplied, but ", currentModule(sim), " requires it ",
+        stop("rasterToMatch is going to be supplied, but ", currentModule(sim), " requires it ",
              "as part of its .inputObjects. Please make it accessible to ", currentModule(sim),
              " in the .inputObjects by passing it in as an object in simInit(objects = list(rasterToMatch = aRaster)",
              " or in a module that gets loaded prior to ", currentModule(sim))
@@ -550,27 +528,20 @@ calcFuelTypes <- function(sim) {
       sim$studyArea <- fixErrors(sim$studyArea)
     }
 
-    if (!identical(crs(sim$studyAreaLarge), crs(sim$rasterToMatchLarge))) {
-      warning(paste0("studyAreaLarge and rasterToMatchLarge projections differ.\n",
-                     "studyAreaLarge will be projected to match rasterToMatchLarge"))
-      sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$rasterToMatchLarge))
-      sim$studyAreaLarge <- fixErrors(sim$studyAreaLarge)
-    }
-
     if (!suppliedElsewhere("rstLCC", sim)) {
-    sim$rstLCCRTM <- Cache(prepInputs,
-                           targetFile = lcc2005Filename,
-                           archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
-                           url = extractURL("rstLCC"),
-                           destinationPath = dPath,
-                           studyArea = sim$studyArea,
-                           rasterToMatch = sim$rasterToMatch,
-                           maskWithRTM = TRUE,
-                           method = "ngb",
-                           datatype = "INT2U",
-                           filename2 = FALSE, overwrite = TRUE,
-                           userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
-                           omitArgs = c("destinationPath", "targetFile", "userTags"))
+      sim$rstLCCRTM <- Cache(prepInputs,
+                             targetFile = lcc2005Filename,
+                             archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
+                             url = extractURL("rstLCC"),
+                             destinationPath = dPath,
+                             studyArea = sim$studyArea,
+                             rasterToMatch = sim$rasterToMatch,
+                             maskWithRTM = TRUE,
+                             method = "ngb",
+                             datatype = "INT2U",
+                             filename2 = FALSE, overwrite = TRUE,
+                             userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
+                             omitArgs = c("destinationPath", "targetFile", "userTags"))
     } else {
       sim$rstLCCRTM <- Cache(postProcess,
                              x = sim$rstLCC,
