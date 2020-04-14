@@ -464,61 +464,49 @@ calcFuelTypes <- function(sim) {
     }
 
     if (needRTM) {
-      if (!suppliedElsewhere("rawBiomassMap", sim)) {
-        sim$rawBiomassMap <- Cache(prepInputs,
-                                   targetFile = asPath(basename(rawBiomassMapFilename)),
-                                   archive = asPath(c("kNN-StructureBiomass.tar",
-                                                      "NFI_MODIS250m_kNN_Structure_Biomass_TotalLiveAboveGround_v0.zip")),
-                                   url = extractURL("rawBiomassMap"),
-                                   destinationPath = dPath,
-                                   studyArea = sim$studyAreaLarge,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
-                                   # studyArea = sim$studyArea,
-                                   rasterToMatch = if (!needRTM) sim$rasterToMatchLarge else NULL,
-                                   # maskWithRTM = TRUE,    ## if RTM not supplied no masking happens (is this intended?)
-                                   maskWithRTM = if (!needRTM) TRUE else FALSE,
-                                   ## TODO: if RTM is not needed use SA CRS? -> this is not correct
-                                   # useSAcrs = if (!needRTM) TRUE else FALSE,
-                                   useSAcrs = FALSE,     ## never use SA CRS
-                                   method = "bilinear",
-                                   datatype = "INT2U",
-                                   filename2 = TRUE, overwrite = TRUE,
-                                   userTags = cacheTags,
-                                   omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+      if (!suppliedElsewhere("rawBiomassMap", sim) ||
+          !compareRaster(sim$rawBiomassMap, sim$studyArea, stopiffalse = FALSE)) {
+        rawBiomassMapURL <- paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                                   "canada-forests-attributes_attributs-forests-canada/",
+                                   "2001-attributes_attributs-2001/",
+                                   "NFI_MODIS250m_2001_kNN_Structure_Biomass_TotalLiveAboveGround_v1.tif")
+        rawBiomassMapFilename <- "NFI_MODIS250m_2001_kNN_Structure_Biomass_TotalLiveAboveGround_v1.tif"
+        rawBiomassMap <- Cache(prepInputs,
+                               targetFile = rawBiomassMapFilename,
+                               url = rawBiomassMapURL,
+                               destinationPath = dPath,
+                               studyArea = sim$studyArea,
+                               rasterToMatch = NULL,
+                               maskWithRTM = FALSE,
+                               useSAcrs = FALSE,     ## never use SA CRS
+                               method = "bilinear",
+                               datatype = "INT2U",
+                               filename2 = NULL,
+                               userTags = c(cacheTags, "rawBiomassMap"),
+                               omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+      } else {
+        rawBiomassMap <- Cache(postProcess,
+                               x = sim$rawBiomassMap,
+                               studyArea = sim$studyArea,
+                               useSAcrs = FALSE,
+                               maskWithRTM = FALSE,   ## mask with SA
+                               method = "bilinear",
+                               datatype = "INT2U",
+                               filename2 = NULL,
+                               overwrite = TRUE,
+                               userTags = cacheTags,
+                               omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
       }
       ## if we need rasterToMatch/rasterToMatchLarge, that means a) we don't have it, but b) we will have rawBiomassMap
       ## even if one of the rasterToMatch is present re-do both.
 
-      if (is.null(sim$rasterToMatch) != is.null(sim$rasterToMatchLarge))
-        warning(paste0("One of rasterToMatch/rasterToMatchLarge is missing. Both will be created \n",
-                       "from rawBiomassMap and studyArea/studyAreaLarge.\n
-              If this is wrong, provide both rasters"))
-
-      sim$rasterToMatchLarge <- sim$rawBiomassMap
-      RTMvals <- getValues(sim$rasterToMatchLarge)
-      sim$rasterToMatchLarge[!is.na(RTMvals)] <- 1
-
-      sim$rasterToMatchLarge <- Cache(writeOutputs, sim$rasterToMatchLarge,
-                                      filename2 = file.path(cachePath(sim), "rasters", "rasterToMatchLarge.tif"),
-                                      datatype = "INT2U", overwrite = TRUE,
-                                      userTags = cacheTags,
-                                      omitArgs = c("userTags"))
-
-      sim$rasterToMatch <- Cache(postProcess,
-                                 x = sim$rawBiomassMap,
-                                 studyArea = sim$studyArea,
-                                 rasterToMatch = sim$rasterToMatchLarge,
-                                 useSAcrs = FALSE,
-                                 maskWithRTM = FALSE,   ## mask with SA
-                                 method = "bilinear",
-                                 datatype = "INT2U",
-                                 filename2 = file.path(cachePath(sim), "rasterToMatch.tif"),
-                                 overwrite = TRUE,
-                                 userTags = cacheTags,
-                                 omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
-
-      ## covert to 'mask'
+      sim$rasterToMatch <- rawBiomassMap
       RTMvals <- getValues(sim$rasterToMatch)
       sim$rasterToMatch[!is.na(RTMvals)] <- 1
+
+      sim$rasterToMatch <- Cache(writeOutputs, sim$rasterToMatch,
+                                 filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
+                                 datatype = "INT2U", overwrite = TRUE)
     }
 
     if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
