@@ -302,7 +302,8 @@ calcFuelTypes <- function(sim) {
       any(!file.exists(file.path(dPath, "sppMultipliers.csv")),
           file.exists(file.path(dPath, "ForestFuelTypes.csv")))) {
     maxcol <- 21 #max(count.fields(file.path(getPaths()$dataPath, "dynamic-biomass-fuels.txt"), sep = ""))
-    dynamicBiomassFuels <- Cache(prepInputs,targetFile = "dynamic-biomass-fuels.txt",
+    dynamicBiomassFuels <- Cache(prepInputs,
+                                 targetFile = "dynamic-biomass-fuels.txt",
                                  url = paste0("https://raw.githubusercontent.com/CeresBarros/",
                                               "Extension-Dynamic-Biomass-Fuels/master/testings/",
                                               "v6.0-2.0/dynamic-biomass-fuels.txt"),
@@ -527,7 +528,7 @@ calcFuelTypes <- function(sim) {
                              maskWithRTM = TRUE,
                              method = "ngb",
                              datatype = "INT2U",
-                             filename2 = FALSE, overwrite = TRUE,
+                             filename2 = NULL, overwrite = TRUE,
                              userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
                              omitArgs = c("destinationPath", "targetFile", "userTags"))
     } else {
