@@ -4,11 +4,11 @@
 # in R packages. If exact location is required, functions will be: sim$<moduleName>$FunctionName
 defineModule(sim, list(
   name = "Biomass_fuels",
-  description = "SpaDES version of the LANDIS-II Dynamic Biomass Fuels Extention v2.2 - 15 Jun 2017", #"insert module description here",
+  description = "SpaDES version of the LANDIS-II Dynamic Biomass Fuels Extention v2.2, made for LandR Biomass model - 15 Jun 2017", #"insert module description here",
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fuels = numeric_version("0.1.9000"),
+  version = list(Biomass_fuels = numeric_version("0.2.0"),
                  LandR = "0.0.3.9000", SpaDES.core = "0.2.7"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
@@ -46,12 +46,12 @@ defineModule(sim, list(
                               "their - or + contribution ('negSwitch'), min and max age for each species (see LANDIS-II",
                               "Dynamic Fire System Extension (v2.1) User Guide). Fuel types come from CF Fire Behaviour",
                               "Prediction System (2nd Ed.). Default values adapted from",
-                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")),
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt")),
     expectsInput(objectName = "fTypeEcoreg", objectClass = "data.table",
                  desc = paste("Table of Fuel Types per Ecoregion (optional, see LANDIS-II Dynamic Fire System",
                               "Extension (v2.1) User Guide). Fuel types come from CF Fire Behaviour Prediction System (2nd Ed.)",
                               "Default values adapted from",
-                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt")),
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt")),
     expectsInput(objectName = "nonForestFuelsTable", objectClass = "data.table",
                  desc = paste("Table of correspondence between non-forested land-cover classes and fire fuels.",
                               "Fuel types come from CF Fire Behaviour Prediction System (2nd Ed.). Default values",
@@ -59,8 +59,9 @@ defineModule(sim, list(
     expectsInput("rasterToMatch", "RasterLayer",
                  desc = "a raster of the studyArea in the same resolution and projection as biomassMap",
                  sourceURL = NA),
-    expectsInput("rstLCC", "RasterLayer",
-                 desc = paste("A land classification map in study area. It must be 'corrected', in the sense that:\n",
+    expectsInput("rstLCCRTM", "RasterLayer",
+                 desc = paste("A land classification map in study area, masked to rasterToMatch It must be 'corrected',",
+                              "in the sense that:\n",
                               "1) Every class must not conflict with any other map in this module\n",
                               "    (e.g., speciesLayers should not have data in LCC classes that are non-treed);\n",
                               "2) It can have treed and non-treed classes. The non-treed will be removed within this\n",
@@ -70,8 +71,6 @@ defineModule(sim, list(
                               "    neighbour class, based on P(sim)$LCCClassesToReplaceNN.\n",
                               "The default layer used, if not supplied, is Canada national land classification in 2005"),
                  sourceURL = "https://drive.google.com/file/d/1g9jr0VrQxqxGjZ4ckF6ZkSMP-zuYzHQC/view?usp=sharing"),
-    expectsInput(objectName = "rstLCCRTM", objectClass = "RasterLayer",
-                 desc = "Same as rstLCC, but masked to rasterToMatch"),
     expectsInput(objectName = "sppEquiv", objectClass = "data.table",
                  desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
                  sourceURL = ""),
@@ -79,7 +78,7 @@ defineModule(sim, list(
                  desc = paste("Table of species biomass coefficient weights.",
                               "Recommended to be close to 1.0 for all species (see LANDIS-II Dynamic Fire System Extension",
                               "(v2.1) User Guide). Default values adapted from ",
-                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"))
+                              "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt"))
   ),
   outputObjects = bind_rows(
     createsOutput(objectName = "fuelTypesMaps", objectClass = "list",
@@ -254,6 +253,21 @@ calcFuelTypes <- function(sim) {
     fuelTypesMaps$curing[] <- NA
   }
 
+  ##  add levels to fuel types raster
+  fuelTypesMaps$finalFuelType <- ratify(fuelTypesMaps$finalFuelType)
+  levs <- as.data.table(raster::levels(fuelTypesMaps$finalFuelType)[[1]])
+  levs2 <- rbind(unique(pixelGroupFuelTypes[, .(finalFuelType, FuelTypeFBP)]),
+                 unique(sim$pixelNonForestFuels[, .(finalFuelType, FuelTypeFBP)]),
+                 use.names = TRUE) %>%
+    unique(.)
+  setnames(levs2, "finalFuelType", "ID")
+  levs <- levs2[levs, on = "ID"]
+  levels(fuelTypesMaps$finalFuelType) <- as.data.frame(levs)
+  setColors(fuelTypesMaps$finalFuelType, n = nrow(levs)) <- brewer.pal(n = nrow(levs), "Accent")
+
+  ## export to sim
+  sim$fuelTypesMaps <- fuelTypesMaps
+
   ## export to sim
   sim$fuelTypesMaps <- fuelTypesMaps
 
@@ -288,10 +302,11 @@ calcFuelTypes <- function(sim) {
       any(!file.exists(file.path(dPath, "sppMultipliers.csv")),
           file.exists(file.path(dPath, "ForestFuelTypes.csv")))) {
     maxcol <- 21 #max(count.fields(file.path(getPaths()$dataPath, "dynamic-biomass-fuels.txt"), sep = ""))
-    dynamicBiomassFuels <- Cache(prepInputs,targetFile = "dynamic-biomass-fuels.txt",
+    dynamicBiomassFuels <- Cache(prepInputs,
+                                 targetFile = "dynamic-biomass-fuels.txt",
                                  url = paste0("https://raw.githubusercontent.com/CeresBarros/",
                                               "Extension-Dynamic-Biomass-Fuels/master/testings/",
-                                              "version-tests/v6.0-2.0/dynamic-biomass-fuels.txt"),
+                                              "v6.0-2.0/dynamic-biomass-fuels.txt"),
                                  destinationPath = dPath,
                                  fun = "utils::read.table",
                                  fill = TRUE, row.names = NULL,
@@ -317,9 +332,8 @@ calcFuelTypes <- function(sim) {
     if (file.exists(file.path(dPath, "ForestFuelTypes.csv"))) {
       ForestFuelTypes <- prepInputs(targetFile = "ForestFuelTypes.csv",
                                     destinationPath = dPath,
-                                    fun = "utils::read.csv",
+                                    fun = "data.table::fread",
                                     header = TRUE)
-      ForestFuelTypes <- data.table(ForestFuelTypes)
     } else {
       message(paste0("Can't find ForestFuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
@@ -358,9 +372,8 @@ calcFuelTypes <- function(sim) {
     if (file.exists(file.path(dPath, "sppMultipliers.csv"))) {
       sppMultipliers <- prepInputs(targetFile = "sppMultipliers.csv",
                                    destinationPath = dPath,
-                                   fun = "read.csv",
+                                   fun = "data.table::fread",
                                    header = TRUE)
-      sppMultipliers <- data.table(sppMultipliers)
 
       ## make sure columns are the right types
       sppMultipliers[, Coefficient := as.numeric(Coefficient)]
@@ -393,10 +406,9 @@ calcFuelTypes <- function(sim) {
     if (file.exists(file.path(dPath, "fTypesEcoregions.csv"))) {
       fTypeEcoreg <- prepInputs(targetFile = "fTypesEcoregions.csv",
                                 destinationPath = dPath,
-                                fun = "utils::read.csv",
+                                fun = "data.table::fread",
                                 header = TRUE,
                                 userTags = cacheTags)
-      fTypeEcoreg <- data.table(fTypeEcoreg)
     } else {
       message(paste0("Can't find fTypesEcoregions.csv in ", dPath,
                      ".\nAssigning NAs to ecoregions in sim$fTypeEcoreg"))
@@ -416,7 +428,7 @@ calcFuelTypes <- function(sim) {
   ## FUEL TYPES FOR NON-FOREST LAND-COVER CLASSES ------
   if (P(sim)$nonForestFire) {
     if (!suppliedElsewhere("nonForestFuelsTable", sim)) {
-      ## for non forest fuels classified as open vegetation/grassland (O1, O2)
+      ## for non forest fuels classified as open vegetation/grassland (O1a, O1b)
       ## the decree of curing needs to be defined, and whether it is fixed (only mean necessary)
       ## or drawn from a distribution (mean, min and max required)
       ## if drawn from a distribution, a normal distribution with right-side fat tail will be used (Perrakis, pers. comm.)
@@ -433,151 +445,103 @@ calcFuelTypes <- function(sim) {
 
   ## LAND COVER RASTERS ----------------------------------
   if (!suppliedElsewhere("rstLCCRTM", sim)) {
+    if (!suppliedElsewhere("studyArea", sim)) {
+      message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
+      sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
+    }
+
+    ## Raster(s) to match ------------------------------------------------
+    needRTM <- FALSE
+    if (is.null(sim$rasterToMatch)) {
+      if (!suppliedElsewhere("rasterToMatch", sim)) {      ## if one is not provided, re do both (safer?)
+        needRTM <- TRUE
+        message("There is no rasterToMatch supplied; will attempt to use rawBiomassMap")
+      } else {
+        stop("rasterToMatch is going to be supplied, but ", currentModule(sim), " requires it ",
+             "as part of its .inputObjects. Please make it accessible to ", currentModule(sim),
+             " in the .inputObjects by passing it in as an object in simInit(objects = list(rasterToMatch = aRaster)",
+             " or in a module that gets loaded prior to ", currentModule(sim))
+      }
+    }
+
+    if (needRTM) {
+      if (!suppliedElsewhere("rawBiomassMap", sim) ||
+          !compareRaster(sim$rawBiomassMap, sim$studyArea, stopiffalse = FALSE)) {
+        rawBiomassMapURL <- paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                                   "canada-forests-attributes_attributs-forests-canada/",
+                                   "2001-attributes_attributs-2001/",
+                                   "NFI_MODIS250m_2001_kNN_Structure_Biomass_TotalLiveAboveGround_v1.tif")
+        rawBiomassMapFilename <- "NFI_MODIS250m_2001_kNN_Structure_Biomass_TotalLiveAboveGround_v1.tif"
+        rawBiomassMap <- Cache(prepInputs,
+                               targetFile = rawBiomassMapFilename,
+                               url = rawBiomassMapURL,
+                               destinationPath = dPath,
+                               studyArea = sim$studyArea,
+                               rasterToMatch = NULL,
+                               maskWithRTM = FALSE,
+                               useSAcrs = FALSE,     ## never use SA CRS
+                               method = "bilinear",
+                               datatype = "INT2U",
+                               filename2 = NULL,
+                               userTags = c(cacheTags, "rawBiomassMap"),
+                               omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+      } else {
+        rawBiomassMap <- Cache(postProcess,
+                               x = sim$rawBiomassMap,
+                               studyArea = sim$studyArea,
+                               useSAcrs = FALSE,
+                               maskWithRTM = FALSE,   ## mask with SA
+                               method = "bilinear",
+                               datatype = "INT2U",
+                               filename2 = NULL,
+                               overwrite = TRUE,
+                               userTags = cacheTags,
+                               omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+      }
+      ## if we need rasterToMatch/rasterToMatchLarge, that means a) we don't have it, but b) we will have rawBiomassMap
+      ## even if one of the rasterToMatch is present re-do both.
+
+      sim$rasterToMatch <- rawBiomassMap
+      RTMvals <- getValues(sim$rasterToMatch)
+      sim$rasterToMatch[!is.na(RTMvals)] <- 1
+
+      sim$rasterToMatch <- Cache(writeOutputs, sim$rasterToMatch,
+                                 filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
+                                 datatype = "INT2U", overwrite = TRUE)
+    }
+
+    if (!compareCRS(sim$studyArea, sim$rasterToMatch)) {
+      warning(paste0("studyArea and rasterToMatch projections differ.\n",
+                     "studyArea will be projected to match rasterToMatch"))
+      sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
+      sim$studyArea <- fixErrors(sim$studyArea)
+    }
+
     if (!suppliedElsewhere("rstLCC", sim)) {
-
-      if (!suppliedElsewhere("studyArea", sim)) {
-        message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
-        sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
-      }
-
-      if (!suppliedElsewhere("studyAreaLarge", sim)) {
-        message("'studyAreaLarge' was not provided by user. Using the same as 'studyArea'")
-        sim <- objectSynonyms(sim, list(c("studyAreaLarge", "studyArea")))
-      }
-
-      if (!identical(crs(sim$studyArea), crs(sim$studyAreaLarge))) {
-        warning("studyArea and studyAreaLarge have different projections.\n
-            studyAreaLarge will be projected to match crs(studyArea)")
-        sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$studyArea))
-      }
-
-      ## check whether SA is within SALarge
-      ## convert to temp sf objects
-      studyArea <- st_as_sf(sim$studyArea)
-      studyAreaLarge <- st_as_sf(sim$studyAreaLarge)
-
-      if (!st_within(studyArea, studyAreaLarge)[[1]])
-        stop("studyArea is not fully within studyAreaLarge.
-           Please check the aligment, projection and shapes of these polygons")
-      rm(studyArea, studyAreaLarge)
-
-      ## Raster(s) to match ------------------------------------------------
-      needRTM <- FALSE
-      if (is.null(sim$rasterToMatch) || is.null(sim$rasterToMatchLarge)) {
-        if (!suppliedElsewhere("rasterToMatch", sim) ||
-            !suppliedElsewhere("rasterToMatchLarge", sim)) {      ## if one is not provided, re do both (safer?)
-          needRTM <- TRUE
-          message("There is no rasterToMatch/rasterToMatchLarge supplied; will attempt to use rawBiomassMap")
-        } else {
-          stop("rasterToMatch/rasterToMatchLarge is going to be supplied, but ", currentModule(sim), " requires it ",
-               "as part of its .inputObjects. Please make it accessible to ", currentModule(sim),
-               " in the .inputObjects by passing it in as an object in simInit(objects = list(rasterToMatch = aRaster)",
-               " or in a module that gets loaded prior to ", currentModule(sim))
-        }
-      }
-
-      if (needRTM) {
-        if (!suppliedElsewhere("rawBiomassMap", sim)) {
-          sim$rawBiomassMap <- Cache(prepInputs,
-                                     targetFile = asPath(basename(rawBiomassMapFilename)),
-                                     archive = asPath(c("kNN-StructureBiomass.tar",
-                                                        "NFI_MODIS250m_kNN_Structure_Biomass_TotalLiveAboveGround_v0.zip")),
-                                     url = extractURL("rawBiomassMap"),
-                                     destinationPath = dPath,
-                                     studyArea = sim$studyAreaLarge,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
-                                     # studyArea = sim$studyArea,
-                                     rasterToMatch = if (!needRTM) sim$rasterToMatchLarge else NULL,
-                                     # maskWithRTM = TRUE,    ## if RTM not supplied no masking happens (is this intended?)
-                                     maskWithRTM = if (!needRTM) TRUE else FALSE,
-                                     ## TODO: if RTM is not needed use SA CRS? -> this is not correct
-                                     # useSAcrs = if (!needRTM) TRUE else FALSE,
-                                     useSAcrs = FALSE,     ## never use SA CRS
-                                     method = "bilinear",
-                                     datatype = "INT2U",
-                                     filename2 = TRUE, overwrite = TRUE,
-                                     userTags = cacheTags,
-                                     omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
-        }
-        ## if we need rasterToMatch/rasterToMatchLarge, that means a) we don't have it, but b) we will have rawBiomassMap
-        ## even if one of the rasterToMatch is present re-do both.
-
-        if (is.null(sim$rasterToMatch) != is.null(sim$rasterToMatchLarge))
-          warning(paste0("One of rasterToMatch/rasterToMatchLarge is missing. Both will be created \n",
-                         "from rawBiomassMap and studyArea/studyAreaLarge.\n
-              If this is wrong, provide both rasters"))
-
-        sim$rasterToMatchLarge <- sim$rawBiomassMap
-        RTMvals <- getValues(sim$rasterToMatchLarge)
-        sim$rasterToMatchLarge[!is.na(RTMvals)] <- 1
-
-        sim$rasterToMatchLarge <- Cache(writeOutputs, sim$rasterToMatchLarge,
-                                        filename2 = file.path(cachePath(sim), "rasters", "rasterToMatchLarge.tif"),
-                                        datatype = "INT2U", overwrite = TRUE,
-                                        userTags = cacheTags,
-                                        omitArgs = c("userTags"))
-
-        sim$rasterToMatch <- Cache(postProcess,
-                                   x = sim$rawBiomassMap,
-                                   studyArea = sim$studyArea,
-                                   rasterToMatch = sim$rasterToMatchLarge,
-                                   useSAcrs = FALSE,
-                                   maskWithRTM = FALSE,   ## mask with SA
-                                   method = "bilinear",
-                                   datatype = "INT2U",
-                                   filename2 = file.path(cachePath(sim), "rasterToMatch.tif"),
-                                   overwrite = TRUE,
-                                   userTags = cacheTags,
-                                   omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
-
-        ## covert to 'mask'
-        RTMvals <- getValues(sim$rasterToMatch)
-        sim$rasterToMatch[!is.na(RTMvals)] <- 1
-      }
-
-      if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
-        warning(paste0("studyArea and rasterToMatch projections differ.\n",
-                       "studyArea will be projected to match rasterToMatch"))
-        sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
-        sim$studyArea <- fixErrors(sim$studyArea)
-      }
-
-      if (!identical(crs(sim$studyAreaLarge), crs(sim$rasterToMatchLarge))) {
-        warning(paste0("studyAreaLarge and rasterToMatchLarge projections differ.\n",
-                       "studyAreaLarge will be projected to match rasterToMatchLarge"))
-        sim$studyAreaLarge <- spTransform(sim$studyAreaLarge, crs(sim$rasterToMatchLarge))
-        sim$studyAreaLarge <- fixErrors(sim$studyAreaLarge)
-      }
-
-      sim$rstLCC <- Cache(prepInputs,
-                          targetFile = lcc2005Filename,
-                          archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
-                          url = extractURL("rstLCC"),
-                          destinationPath = dPath,
-                          studyArea = sim$studyAreaLarge,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
-                          # studyArea = sim$studyArea,
-                          rasterToMatch = sim$rasterToMatchLarge,
-                          # rasterToMatch = sim$rasterToMatch,
-                          maskWithRTM = TRUE,
-                          method = "bilinear",
-                          datatype = "INT2U",
-                          filename2 = FALSE, overwrite = TRUE,
-                          userTags = c("prepInputsrstLCC_rtm", cacheTags), # use at least 1 unique userTag
-                          omitArgs = c("destinationPath", "targetFile", "userTags"))
+      sim$rstLCCRTM <- Cache(prepInputs,
+                             targetFile = lcc2005Filename,
+                             archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
+                             url = extractURL("rstLCC"),
+                             destinationPath = dPath,
+                             studyArea = sim$studyArea,
+                             rasterToMatch = sim$rasterToMatch,
+                             maskWithRTM = TRUE,
+                             method = "ngb",
+                             datatype = "INT2U",
+                             filename2 = NULL, overwrite = TRUE,
+                             userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
+                             omitArgs = c("destinationPath", "targetFile", "userTags"))
+    } else {
+      sim$rstLCCRTM <- Cache(postProcess,
+                             x = sim$rstLCC,
+                             rasterToMatch = sim$rasterToMatch,
+                             method = "ngb",
+                             maskWithRTM = TRUE,
+                             filename2 = NULL,
+                             userTags = c("prepInputsrstLCCRTM", cacheTags),
+                             omitArgs = "userTags")
     }
 
-    rstLCCRTM <- sim$rstLCC
-
-    if (!compareRaster(rstLCCRTM, sim$rasterToMatch, values = FALSE, stopiffalse = FALSE)) {
-      rstLCCRTM <- Cache(postProcess,
-                         x = rstLCCRTM,
-                         rasterToMatch = sim$rasterToMatch,
-                         maskWithRTM = TRUE,
-                         filename2 = NULL,
-                         userTags = cacheTags,
-                         omitArgs = "userTags")
-    }
-
-    sim$rstLCCRTM <- rstLCCRTM
   }
 
   return(invisible(sim))
