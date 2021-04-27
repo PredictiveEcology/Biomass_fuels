@@ -448,7 +448,7 @@ calcFuelTypes <- function(sim) {
       stop("Please provide a 'studyArea' polygon")
       # message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
       # sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)  # Jan 2021 we agreed to force user to provide a SA/SAL
-      }
+    }
 
     ## Raster(s) to match ------------------------------------------------
     needRTM <- FALSE
@@ -518,19 +518,17 @@ calcFuelTypes <- function(sim) {
     }
 
     if (!suppliedElsewhere("rstLCC", sim)) {
-      sim$rstLCCRTM <- Cache(prepInputs,
-                             targetFile = lcc2005Filename,
-                             archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
-                             url = extractURL("rstLCC"),
-                             destinationPath = dPath,
-                             studyArea = sim$studyArea,
-                             rasterToMatch = sim$rasterToMatch,
-                             maskWithRTM = TRUE,
-                             method = "ngb",
-                             datatype = "INT2U",
-                             filename2 = NULL, overwrite = TRUE,
-                             userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
-                             omitArgs = c("destinationPath", "targetFile", "userTags"))
+      sim$rstLCCRTM <- prepInputsLCC(
+        destinationPath = dPath,
+        studyArea = sim$studyArea,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
+        rasterToMatch = sim$rasterToMatch,
+        filename2 = .suffix("rstLCCRTM.tif", paste0("_", P(sim)$.studyAreaName)),
+        overwrite = TRUE,
+        userTags = c("rstLCCRTM", currentModule(sim), P(sim)$.studyAreaName))
+
+      if (!compareRaster(sim$rstLCCRTM, sim$rasterToMatchLarge)) {
+        sim$rstLCCRTM <- projectRaster(sim$rstLCCRTM, to = sim$rasterToMatch)
+      }
     } else {
       sim$rstLCCRTM <- Cache(postProcess,
                              x = sim$rstLCC,
@@ -541,7 +539,6 @@ calcFuelTypes <- function(sim) {
                              userTags = c("prepInputsrstLCCRTM", cacheTags),
                              omitArgs = "userTags")
     }
-
   }
 
   return(invisible(sim))
