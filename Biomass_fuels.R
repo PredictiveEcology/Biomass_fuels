@@ -290,7 +290,7 @@ calcFuelTypes <- function(sim) {
   paramCheckOtherMods(sim, "sppEquivCol", ifSetButDifferent = "error")
 
   sppOuts <- sppHarmonize(sim$sppEquiv, sim$sppNameVector, P(sim)$sppEquivCol,
-                          sim$sppColorVect)
+                          sim$sppColorVect, studyArea = sim$studyArea)
   ## the following may, or may not change inputs
   sim$sppEquiv <- sppOuts$sppEquiv
   P(sim)$sppEquivCol <- sppOuts$sppEquivCol
@@ -339,7 +339,7 @@ calcFuelTypes <- function(sim) {
       message(paste0("Can't find ForestFuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
 
-      ForestFuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
+      ForestFuelTypes <- dynamicBiomassFuels[(which(col1 == "FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
                                              col1:col14]
       ## rename columns
       ForestFuelTypes[1, `:=`(col3 = "minAge",
