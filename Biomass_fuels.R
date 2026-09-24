@@ -458,11 +458,8 @@ calcFuelTypes <- function(sim) {
       # sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)  # Jan 2021 we agreed to force user to provide a SA/SAL
     }
 
-    if (is.na(P(sim)$.studyAreaName)) {
-      params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyArea)
-      message("The .studyAreaName is not supplied; derived name from sim$studyArea: ",
-              params(sim)[[currentModule(sim)]][[".studyAreaName"]])
-    }
+    if (is.null(P(sim)$.studyAreaName) || is.na(P(sim)$.studyAreaName))
+      P(sim)$.studyAreaName <- reproducible::studyAreaName(sim$studyArea)
 
     ## Raster(s) to match ------------------------------------------------
     needRTM <- FALSE
