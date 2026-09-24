@@ -8,7 +8,7 @@ defineModule(sim, list(
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fuels = numeric_version("0.2.0")),
+  version = list(Biomass_fuels = numeric_version("0.2.0.9000")),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
@@ -33,6 +33,8 @@ defineModule(sim, list(
                                  "land cover classes in accordance to the classes in 'rstLCC'")),
     defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
                     "The column in sim$specieEquivalency data.table to use as a naming convention"),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    "Human-readable name for the study area used. If `NA`, a hash of `studyArea` will be used."),
     defineParameter(".useCache", "logical", "init", NA, NA,
                     desc = "use caching for the spinup simulation?")
   ),
@@ -58,6 +60,9 @@ defineModule(sim, list(
     expectsInput("rasterToMatch", "RasterLayer",
                  desc = "a raster of the studyArea in the same resolution and projection as biomassMap",
                  sourceURL = NA),
+    expectsInput("rasterToMatchLarge", "RasterLayer",
+                 desc = "a raster of `studyAreaLarge`; `rstLCCRTM`, when made here, is compared with it",
+                 sourceURL = NA),
     expectsInput("rstLCCRTM", "RasterLayer",
                  desc = paste("A land classification map in study area, masked to rasterToMatch It must be 'corrected',",
                               "in the sense that:\n",
@@ -70,6 +75,10 @@ defineModule(sim, list(
                               "    neighbour class, based on P(sim)$LCCClassesToReplaceNN.\n",
                               "The default layer used, if not supplied, is Canada national land classification in 2005"),
                  sourceURL = "https://drive.google.com/file/d/1g9jr0VrQxqxGjZ4ckF6ZkSMP-zuYzHQC/view?usp=sharing"),
+    expectsInput("studyArea", "SpatialPolygonsDataFrame",
+                 desc = paste("Polygon of the study area. Required to make `rstLCCRTM` when it is not supplied;",
+                              "its hash is the default `.studyAreaName`."),
+                 sourceURL = NA),
     expectsInput(objectName = "sppEquiv", objectClass = "data.table",
                  desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
                  sourceURL = ""),
@@ -450,6 +459,12 @@ calcFuelTypes <- function(sim) {
       stop("Please provide a 'studyArea' polygon")
       # message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
       # sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)  # Jan 2021 we agreed to force user to provide a SA/SAL
+    }
+
+    if (is.na(P(sim)$.studyAreaName)) {
+      params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyArea)
+      message("The .studyAreaName is not supplied; derived name from sim$studyArea: ",
+              params(sim)[[currentModule(sim)]][[".studyAreaName"]])
     }
 
     ## Raster(s) to match ------------------------------------------------
