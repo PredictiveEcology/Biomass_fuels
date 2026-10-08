@@ -1,5 +1,6 @@
 # Biomass_fuels 0.2.0.9001
 
+* The message for an unset `.studyAreaName` comes from `reproducible::studyAreaName(notSupplied = ".studyAreaName")` (PredictiveEcology/reproducible#638), so it reads the same in every module that uses it: "`.studyAreaName` not supplied; using a hash of `<object>`: <hash>". With an older reproducible the name is the same and there is no message.
 * The land-cover raster made in `.inputObjects` (`rstLCCRTM`) is compared with `rasterToMatch`, which it is then
   projected to, instead of `rasterToMatchLarge`; that input is no longer declared. Without a `rasterToMatchLarge`
   the comparison errored. Same fix as Biomass_fuelsPFG ce302b3.

@@ -459,7 +459,7 @@ calcFuelTypes <- function(sim) {
     }
 
     if (is.null(P(sim)$.studyAreaName) || is.na(P(sim)$.studyAreaName))
-      P(sim)$.studyAreaName <- reproducible::studyAreaName(sim$studyArea)
+      P(sim)$.studyAreaName <- reproducible::studyAreaName(sim$studyArea, notSupplied = ".studyAreaName")
 
     ## Raster(s) to match ------------------------------------------------
     needRTM <- FALSE
