@@ -8,15 +8,14 @@ defineModule(sim, list(
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fuels = numeric_version("0.2.0"),
-                 LandR = "0.0.3.9000", SpaDES.core = "0.2.7"),
+  version = list(Biomass_fuels = numeric_version("0.3.0")),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fuels.Rmd"),
   reqdPkgs = list("data.table", "dplyr", "sn",
-                  "PredictiveEcology/LandR@development",
+                  "PredictiveEcology/LandR@development (>= 1.0.7.9015)",
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
                   "PredictiveEcology/reproducible@development"),
@@ -34,10 +33,12 @@ defineModule(sim, list(
                                  "land cover classes in accordance to the classes in 'rstLCC'")),
     defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
                     "The column in sim$specieEquivalency data.table to use as a naming convention"),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    "Human-readable name for the study area used. If `NA`, a hash of `studyArea` will be used."),
     defineParameter(".useCache", "logical", "init", NA, NA,
                     desc = "use caching for the spinup simulation?")
   ),
-  inputObjects = bind_rows(
+  inputObjects = bindrows(
     expectsInput(objectName = "cohortData", objectClass = "data.table",
                  desc = "age cohort-biomass table hooked to pixel group map by pixelGroupIndex at
                  succession time step", sourceURL = NA),
@@ -71,6 +72,10 @@ defineModule(sim, list(
                               "    neighbour class, based on P(sim)$LCCClassesToReplaceNN.\n",
                               "The default layer used, if not supplied, is Canada national land classification in 2005"),
                  sourceURL = "https://drive.google.com/file/d/1g9jr0VrQxqxGjZ4ckF6ZkSMP-zuYzHQC/view?usp=sharing"),
+    expectsInput("studyArea", "SpatialPolygonsDataFrame",
+                 desc = paste("Polygon of the study area. Required to make `rstLCCRTM` when it is not supplied;",
+                              "its hash is the default `.studyAreaName`."),
+                 sourceURL = NA),
     expectsInput(objectName = "sppEquiv", objectClass = "data.table",
                  desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
                  sourceURL = ""),
@@ -80,7 +85,7 @@ defineModule(sim, list(
                               "(v2.1) User Guide). Default values adapted from ",
                               "https://raw.githubusercontent.com/CeresBarros/Extension-Dynamic-Biomass-Fuels/master/testings/v6.0-2.0/dynamic-biomass-fuels.txt"))
   ),
-  outputObjects = bind_rows(
+  outputObjects = bindrows(
     createsOutput(objectName = "fuelTypesMaps", objectClass = "list",
                   desc = "List of RasterLayers of fuel types and coniferDominance per pixel."),
     createsOutput(objectName = "pixelNonForestFuels", objectClass = "data.table",
@@ -283,16 +288,18 @@ calcFuelTypes <- function(sim) {
   #######################################################
 
   ## SPECIES EQUIVALENCY TABLE ---------------------------
-  if (!suppliedElsewhere("sppEquiv", sim)) {
-    if (!is.null(sim$sppColorVect))
-      stop("If you provide sppColorVect, you MUST also provide sppEquiv")
+  ## make sppEquiv table and associated columns, vectors
+  ## do not use suppliedElsewhere here as we need the tables to exist (or not)
+  ## already (rather than potentially being supplied by a downstream module)
+  ## the function checks whether the tables exist internally.
+  ## check parameter consistency across modules
+  paramCheckOtherMods(sim, "sppEquivCol", ifSetButDifferent = "error")
 
-    data("sppEquivalencies_CA", package = "LandR", envir = environment())
-    sim$sppEquiv <- as.data.table(sppEquivalencies_CA)
-
-    ## By default, Abies_las is renamed to Abies_sp
-    sim$sppEquiv[KNN == "Abie_Las", LandR := "Abie_sp"]
-  }
+  sppOuts <- sppHarmonize(sim$sppEquiv, sim$sppNameVector, P(sim)$sppEquivCol,
+                          sim$sppColorVect, studyArea = sim$studyArea)
+  ## the following may, or may not change inputs
+  sim$sppEquiv <- sppOuts$sppEquiv
+  P(sim)$sppEquivCol <- sppOuts$sppEquivCol
 
   ## Get LANDIS example parameters -----------------------
   ## to use if others haven't been supplied in <module>/inputs
@@ -338,7 +345,7 @@ calcFuelTypes <- function(sim) {
       message(paste0("Can't find ForestFuelTypes.csv in ", dPath,
                      ".\nUsing LANDIS example file"))
 
-      ForestFuelTypes <- dynamicBiomassFuels[(which(col1=="FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
+      ForestFuelTypes <- dynamicBiomassFuels[(which(col1 == "FuelTypes") + 1) : (which(col1 == ">>EcoregionsTable") - 1),
                                              col1:col14]
       ## rename columns
       ForestFuelTypes[1, `:=`(col3 = "minAge",
@@ -446,9 +453,13 @@ calcFuelTypes <- function(sim) {
   ## LAND COVER RASTERS ----------------------------------
   if (!suppliedElsewhere("rstLCCRTM", sim)) {
     if (!suppliedElsewhere("studyArea", sim)) {
-      message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
-      sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
+      stop("Please provide a 'studyArea' polygon")
+      # message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
+      # sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)  # Jan 2021 we agreed to force user to provide a SA/SAL
     }
+
+    if (is.null(P(sim)$.studyAreaName) || is.na(P(sim)$.studyAreaName))
+      P(sim)$.studyAreaName <- reproducible::studyAreaName(sim$studyArea, notSupplied = ".studyAreaName")
 
     ## Raster(s) to match ------------------------------------------------
     needRTM <- FALSE
@@ -518,19 +529,17 @@ calcFuelTypes <- function(sim) {
     }
 
     if (!suppliedElsewhere("rstLCC", sim)) {
-      sim$rstLCCRTM <- Cache(prepInputs,
-                             targetFile = lcc2005Filename,
-                             archive = asPath("LandCoverOfCanada2005_V1_4.zip"),
-                             url = extractURL("rstLCC"),
-                             destinationPath = dPath,
-                             studyArea = sim$studyArea,
-                             rasterToMatch = sim$rasterToMatch,
-                             maskWithRTM = TRUE,
-                             method = "ngb",
-                             datatype = "INT2U",
-                             filename2 = NULL, overwrite = TRUE,
-                             userTags = c("prepInputsrstLCCRTM", cacheTags), # use at least 1 unique userTag
-                             omitArgs = c("destinationPath", "targetFile", "userTags"))
+      sim$rstLCCRTM <- prepInputsLCC(
+        destinationPath = dPath,
+        studyArea = sim$studyArea,   ## Ceres: makePixel table needs same no. pixels for this, RTM rawBiomassMap, LCC.. etc
+        rasterToMatch = sim$rasterToMatch,
+        filename2 = .suffix("rstLCCRTM.tif", paste0("_", P(sim)$.studyAreaName)),
+        overwrite = TRUE,
+        userTags = c("rstLCCRTM", currentModule(sim), P(sim)$.studyAreaName))
+
+      if (!compareRaster(sim$rstLCCRTM, sim$rasterToMatch)) {
+        sim$rstLCCRTM <- projectRaster(sim$rstLCCRTM, to = sim$rasterToMatch)
+      }
     } else {
       sim$rstLCCRTM <- Cache(postProcess,
                              x = sim$rstLCC,
@@ -541,7 +550,6 @@ calcFuelTypes <- function(sim) {
                              userTags = c("prepInputsrstLCCRTM", cacheTags),
                              omitArgs = "userTags")
     }
-
   }
 
   return(invisible(sim))

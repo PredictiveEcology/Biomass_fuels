@@ -1,7 +1,7 @@
 ---
 title: "Biomass_fuels"
 author: ""
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: "08 October 2026"
 output:
   html_document:
     df_print: paged
@@ -23,7 +23,8 @@ For help writing in R Markdown, see http://rmarkdown.rstudio.com/.
 
 # Usage
 
-```{r module_usage, eval = FALSE}
+
+``` r
 library(SpaDES)
 
 setPaths(modulePath = "..") ## the directory containing this module
