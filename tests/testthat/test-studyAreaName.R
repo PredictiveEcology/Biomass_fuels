@@ -9,7 +9,8 @@ test_that(".studyAreaName is a parameter of this module, defaulting to NA", {
   expect_true(".studyAreaName" %in% p$paramName)
   expect_true(is.na(p$default[[which(p$paramName == ".studyAreaName")]]))
   ins <- SpaDES.core::moduleInputs(moduleName, dirname(moduleRoot))$objectName
-  expect_true(all(c("studyArea", "rasterToMatchLarge") %in% ins))
+  expect_true("studyArea" %in% ins)
+  expect_false("rasterToMatchLarge" %in% ins)
 })
 
 runInputObjects <- function(studyAreaName = NULL) {
@@ -37,7 +38,7 @@ runInputObjects <- function(studyAreaName = NULL) {
   sim <- SpaDES.core::simInit(
     modules = moduleName, params = params,
     paths = list(modulePath = dirname(moduleRoot), inputPath = td, outputPath = td, cachePath = td),
-    objects = list(studyArea = sa, rasterToMatch = r, rasterToMatchLarge = r,
+    objects = list(studyArea = sa, rasterToMatch = r,
                    sppEquiv = LandR::sppEquivalencies_CA[LandR %in% c("Pice_mar", "Pinu_ban")],
                    ForestFuelTypes = tbl, sppMultipliers = tbl, fTypeEcoreg = tbl,
                    FirePFGs = tbl, FirePFGs2Fuels = tbl))

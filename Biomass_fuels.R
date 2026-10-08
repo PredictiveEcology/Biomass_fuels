@@ -8,7 +8,7 @@ defineModule(sim, list(
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fuels = numeric_version("0.2.0.9000")),
+  version = list(Biomass_fuels = numeric_version("0.2.0.9001")),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
@@ -59,9 +59,6 @@ defineModule(sim, list(
                               "use the LCC2005 land-cover product, and consider only grasslands and shurblands.")),
     expectsInput("rasterToMatch", "RasterLayer",
                  desc = "a raster of the studyArea in the same resolution and projection as biomassMap",
-                 sourceURL = NA),
-    expectsInput("rasterToMatchLarge", "RasterLayer",
-                 desc = "a raster of `studyAreaLarge`; `rstLCCRTM`, when made here, is compared with it",
                  sourceURL = NA),
     expectsInput("rstLCCRTM", "RasterLayer",
                  desc = paste("A land classification map in study area, masked to rasterToMatch It must be 'corrected',",
@@ -461,11 +458,8 @@ calcFuelTypes <- function(sim) {
       # sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)  # Jan 2021 we agreed to force user to provide a SA/SAL
     }
 
-    if (is.na(P(sim)$.studyAreaName)) {
-      params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyArea)
-      message("The .studyAreaName is not supplied; derived name from sim$studyArea: ",
-              params(sim)[[currentModule(sim)]][[".studyAreaName"]])
-    }
+    if (is.null(P(sim)$.studyAreaName) || is.na(P(sim)$.studyAreaName))
+      P(sim)$.studyAreaName <- reproducible::studyAreaName(sim$studyArea, notSupplied = ".studyAreaName")
 
     ## Raster(s) to match ------------------------------------------------
     needRTM <- FALSE
@@ -543,7 +537,7 @@ calcFuelTypes <- function(sim) {
         overwrite = TRUE,
         userTags = c("rstLCCRTM", currentModule(sim), P(sim)$.studyAreaName))
 
-      if (!compareRaster(sim$rstLCCRTM, sim$rasterToMatchLarge)) {
+      if (!compareRaster(sim$rstLCCRTM, sim$rasterToMatch)) {
         sim$rstLCCRTM <- projectRaster(sim$rstLCCRTM, to = sim$rasterToMatch)
       }
     } else {
