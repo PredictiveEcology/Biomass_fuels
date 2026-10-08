@@ -1,0 +1,29 @@
+## Example caller for the render-module-rmd reusable workflow.
+## Replace Biomass_fuels with the module name (which must match the repository name).
+## SpaDES.core::use_gha() generates this file; it is kept here so the shape is
+## visible without reading the generator.
+
+name: Render module Rmd
+
+on:
+  pull_request:
+    branches: [main, master, development]
+  push:
+    branches: [main, master, development]
+    paths:
+      - .github/workflows/render-module-rmd.yaml
+      - Biomass_fuels.R
+      - Biomass_fuels.Rmd
+  workflow_dispatch:
+
+jobs:
+  render-module-rmd:
+    ## The called workflow splits `render` (contents: read, runs the module's own
+    ## code) from `commit` (contents: write, runs nothing but git). A called
+    ## workflow can only reduce what is granted here, so the write scope has to
+    ## be granted at the call site.
+    permissions:
+      contents: write
+    uses: PredictiveEcology/actions/.github/workflows/render-module-rmd.yaml@main
+    with:
+      module: Biomass_fuels
