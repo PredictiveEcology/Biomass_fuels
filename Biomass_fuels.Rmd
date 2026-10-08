@@ -1,8 +1,11 @@
 ---
 title: "Biomass_fuels"
 author: ""
-date: "26 July 2018"
-output: pdf_document
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    df_print: paged
+    keep_md: yes
 ---
 
 # Overview
@@ -20,10 +23,10 @@ For help writing in R Markdown, see http://rmarkdown.rstudio.com/.
 
 # Usage
 
-```{r module_usage}
+```{r module_usage, eval = FALSE}
 library(SpaDES)
 
-setPaths(modulePath = file.path("E:/GitHub"))
+setPaths(modulePath = "..") ## the directory containing this module
 getPaths() # shows where the 4 relevant paths are
 
 times <- list(start = 0, end = 10)
