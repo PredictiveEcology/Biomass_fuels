@@ -1,3 +1,5 @@
+# Biomass_fuels (development version)
+
 # Biomass_fuels 0.3.0
 
 This release fixes the module so it can prepare its own land-cover map. Before, making that map always failed unless a project supplied it, because the study area was not declared as an input and the map was checked against an input most projects do not have.

@@ -8,7 +8,7 @@ defineModule(sim, list(
   keywords = c("fire fuels", "fuel type", "LANDIS", "LandR"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fuels = numeric_version("0.3.0")),
+  version = list(Biomass_fuels = numeric_version("0.3.0.9000")),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
