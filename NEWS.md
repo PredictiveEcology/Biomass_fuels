@@ -1,3 +1,9 @@
+# Biomass_fuels 0.3.0
+
+This release fixes the module so it can prepare its own land-cover map. Before, making that map always failed unless a project supplied it, because the study area was not declared as an input and the map was checked against an input most projects do not have.
+
+The map's file name and cache label now come from a new study area name setting. If it is not set, a short code made from the study area is used, and a message says so. The module also gains automatic checks that run on every change.
+
 # Biomass_fuels 0.2.0.9001
 
 * The message for an unset `.studyAreaName` comes from `reproducible::studyAreaName(notSupplied = ".studyAreaName")` (PredictiveEcology/reproducible#638), so it reads the same in every module that uses it: "`.studyAreaName` not supplied; using a hash of `<object>`: <hash>". With an older reproducible the name is the same and there is no message.
